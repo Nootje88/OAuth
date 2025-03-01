@@ -1,0 +1,18 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]  # Load .env file
+  datasource:
+    url: jdbc:mysql://localhost:3306/OAuthTemplate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        ddl-auto: update
+    generate-ddl: true
+  sql:
+    init:
+      mode: never
