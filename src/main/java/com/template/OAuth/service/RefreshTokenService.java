@@ -11,6 +11,8 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.Optional;
 
@@ -29,14 +31,28 @@ public class RefreshTokenService {
     @Autowired
     private RefreshTokenProvider refreshTokenProvider;
 
+    @Transactional
     public RefreshToken generateRefreshToken(User user) {
-        RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setUser(user);
-        refreshToken.setToken(refreshTokenProvider.generateRefreshToken());
-        refreshToken.setExpiryDate(Instant.now().plusSeconds(7 * 24 * 60 * 60)); // 7 days
-        return refreshTokenRepository.save(refreshToken);
+        // First check if the user already has a refresh token
+        Optional<RefreshToken> existingToken = refreshTokenRepository.findByUser(user);
+
+        if (existingToken.isPresent()) {
+            // Update existing token instead of creating a new one
+            RefreshToken refreshToken = existingToken.get();
+            refreshToken.setToken(refreshTokenProvider.generateRefreshToken());
+            refreshToken.setExpiryDate(Instant.now().plusSeconds(7 * 24 * 60 * 60)); // 7 days
+            return refreshTokenRepository.save(refreshToken);
+        } else {
+            // Create new token
+            RefreshToken refreshToken = new RefreshToken();
+            refreshToken.setUser(user);
+            refreshToken.setToken(refreshTokenProvider.generateRefreshToken());
+            refreshToken.setExpiryDate(Instant.now().plusSeconds(7 * 24 * 60 * 60)); // 7 days
+            return refreshTokenRepository.save(refreshToken);
+        }
     }
 
+    @Transactional
     public RefreshTokenResponse refreshToken(String oldRefreshToken, HttpServletResponse response) {
         Optional<RefreshToken> refreshTokenOpt = refreshTokenRepository.findByToken(oldRefreshToken);
 
@@ -60,10 +76,18 @@ public class RefreshTokenService {
             // Store in HTTP-only cookie
             Cookie cookie = new Cookie("jwt", newAccessToken);
             cookie.setHttpOnly(true);
-            cookie.setSecure(true);
+            cookie.setSecure(false); // Set to true in production
             cookie.setPath("/");
             cookie.setMaxAge(3600); // Expires in 1 hour
             response.addCookie(cookie);
+
+            // Set refresh token in a different cookie
+            Cookie refreshCookie = new Cookie("refresh_token", newRefreshToken);
+            refreshCookie.setHttpOnly(true);
+            refreshCookie.setSecure(false); // Set to true in production
+            refreshCookie.setPath("/refresh-token");
+            refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+            response.addCookie(refreshCookie);
 
             return new RefreshTokenResponse(newAccessToken, newRefreshToken, "Token refreshed successfully");
         } else {

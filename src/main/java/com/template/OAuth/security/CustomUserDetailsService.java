@@ -1,7 +1,7 @@
 package com.template.OAuth.security;
 
-import com.template.OAuth.entities.User;
-import com.template.OAuth.repositories.UserRepository;
+import com.template.OAuth.entities.User; // ✅ Fix import
+import com.template.OAuth.repositories.UserRepository; // ✅ Fix import
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -21,13 +21,15 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Optional<User> user = userRepository.findByEmail(email);
+
         if (user.isEmpty()) {
             throw new UsernameNotFoundException("User not found with email: " + email);
         }
+
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.get().getEmail())
-                .password("") // No password needed for OAuth users
-                .authorities("USER") // You can extend roles/permissions later
+                .password("") // ✅ No password needed for OAuth users
+                .authorities("USER") // ✅ Set user roles here
                 .build();
     }
 }

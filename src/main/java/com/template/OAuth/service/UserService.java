@@ -16,7 +16,9 @@ public class UserService {
     public User saveUser(OidcUser oidcUser, String providerName, String providerId) {
         String email = oidcUser.getEmail();
         Optional<User> existingUser = userRepository.findByEmail(email);
-        AuthProvider authProvider = AuthProvider.valueOf(providerName.toUpperCase());
+
+        // Determine the auth provider based on the issuer URL
+        AuthProvider authProvider = determineAuthProvider(providerName);
 
         User user = existingUser.orElseGet(() -> {
             User newUser = new User();
@@ -31,12 +33,27 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    private AuthProvider determineAuthProvider(String providerName) {
+        // Convert the provider name/URL to a supported enum value
+        if (providerName.contains("google")) {
+            return AuthProvider.GOOGLE;
+        } else if (providerName.contains("spotify")) {
+            return AuthProvider.SPOTIFY;
+        } else if (providerName.contains("apple")) {
+            return AuthProvider.APPLE;
+        } else if (providerName.contains("soundcloud")) {
+            return AuthProvider.SOUNDCLOUD;
+        }
+        // Default to GOOGLE if unknown
+        return AuthProvider.GOOGLE;
+    }
+
     private void setProviderId(User user, AuthProvider provider, String providerId) {
         switch (provider) {
             case GOOGLE -> user.setGoogleId(providerId);
-            case SPOTIFY -> user.setSpotifyId(providerId);
-            case APPLE -> user.setAppleId(providerId);
-            case SOUNDCLOUD -> user.setSoundcloudId(providerId);
+//            case SPOTIFY -> user.setSpotifyId(providerId);
+//            case APPLE -> user.setAppleId(providerId);
+//            case SOUNDCLOUD -> user.setSoundcloudId(providerId);
         }
     }
 
