@@ -27,6 +27,11 @@ spring:
               - openid
               - profile
               - email
+  # Multipart file settings for profile picture uploads
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 #          spotify:
 #            client-id: ${SPOTIFY_CLIENT_ID}
@@ -50,3 +55,10 @@ logging:
     org.springframework.security: DEBUG
     org.springframework.web: DEBUG
     org.springframework.web.cors: DEBUG
+
+# User profile configuration
+app:
+  profile:
+    upload-dir: uploads/profiles  # Directory for storing profile pictures
+    max-bio-length: 500           # Maximum biography length in characters
+    default-theme: SYSTEM         # Default theme preference (LIGHT, DARK, or SYSTEM)

@@ -3,10 +3,17 @@ package com.template.OAuth.entities;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import com.template.OAuth.enums.AuthProvider;
+import com.template.OAuth.enums.NotificationType;
 import com.template.OAuth.enums.Role;
+import com.template.OAuth.enums.ThemePreference;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -36,7 +43,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Set<Role> roles = new HashSet<>();
 
-    // Existing fields for OAuth provider IDs
+    // OAuth provider IDs
     @Column(unique = true)
     private String googleId;
 
@@ -49,12 +56,94 @@ public class User {
     @Column(unique = true)
     private String soundcloudId;
 
+    // Extended profile information
+    private String biography;
+    private String location;
+    private String phoneNumber;
+    private String alternativeEmail;
+
+    // User preferences
+    @Enumerated(EnumType.STRING)
+    private ThemePreference themePreference = ThemePreference.SYSTEM;
+
+    // Notification preferences
+    @ElementCollection
+    @CollectionTable(name = "user_notification_preferences", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    private Set<NotificationType> enabledNotifications = new HashSet<>();
+
+    // Activity tracking
+    @CreationTimestamp
+    private Instant registrationDate;
+
+    @UpdateTimestamp
+    private Instant lastUpdated;
+
+    private Instant lastLoginDate;
+    private Instant lastActiveDate;
+    private Integer loginCount = 0;
+    private Integer profileUpdateCount = 0;
+
+    // Profile update history (One-to-Many relationship)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfileUpdateHistory> updateHistory = new ArrayList<>();
+
     // Helper methods for role management
     public void addRole(Role role) {
+        if (roles == null) {
+            roles = new HashSet<>();
+        }
         roles.add(role);
     }
 
     public boolean hasRole(Role role) {
-        return roles.contains(role);
+        return roles != null && roles.contains(role);
+    }
+
+    // Helper methods for notification preferences
+    public void enableNotification(NotificationType type) {
+        if (enabledNotifications == null) {
+            enabledNotifications = new HashSet<>();
+        }
+        enabledNotifications.add(type);
+    }
+
+    public void disableNotification(NotificationType type) {
+        if (enabledNotifications != null) {
+            enabledNotifications.remove(type);
+        }
+    }
+
+    public boolean hasNotificationEnabled(NotificationType type) {
+        return enabledNotifications != null && enabledNotifications.contains(type);
+    }
+
+    // Helper method to record login
+    public void recordLogin() {
+        this.lastLoginDate = Instant.now();
+        this.lastActiveDate = Instant.now();
+        this.loginCount = (this.loginCount == null) ? 1 : this.loginCount + 1;
+    }
+
+    // Helper method to record activity
+    public void recordActivity() {
+        this.lastActiveDate = Instant.now();
+    }
+
+    // Helper method to add profile update history
+    public void addUpdateHistory(String field, String oldValue, String newValue) {
+        ProfileUpdateHistory history = new ProfileUpdateHistory();
+        history.setUser(this);
+        history.setFieldName(field);
+        history.setOldValue(oldValue);
+        history.setNewValue(newValue);
+        history.setUpdateDate(Instant.now());
+
+        if (this.updateHistory == null) {
+            this.updateHistory = new ArrayList<>();
+        }
+
+        this.updateHistory.add(history);
+        this.profileUpdateCount = (this.profileUpdateCount == null) ? 1 : this.profileUpdateCount + 1;
     }
 }

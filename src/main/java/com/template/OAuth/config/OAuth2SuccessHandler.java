@@ -7,6 +7,7 @@ import com.template.OAuth.service.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -20,6 +21,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+
+    @Value("${app.security.jwt.expiration:3600000}")
+    private long jwtExpirationMs; // Default: 1 hour
+
+    @Value("${app.security.refresh.expiration:604800000}")
+    private long refreshTokenExpirationMs; // Default: 7 days
 
     public OAuth2SuccessHandler(UserService userService, JwtTokenProvider jwtTokenProvider, RefreshTokenService refreshTokenService) {
         this.userService = userService;
@@ -35,7 +42,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             OidcUser oidcUser = (OidcUser) authentication.getPrincipal();
 
             try {
-                // Save or update user in database
+                // Save or update user in database - this now includes login tracking
                 User user = userService.saveUser(oidcUser, oidcUser.getIssuer().toString(), oidcUser.getSubject());
 
                 // Generate JWT token
@@ -49,7 +56,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 cookie.setHttpOnly(true);
                 cookie.setSecure(false); // Set to true in production
                 cookie.setPath("/");
-                cookie.setMaxAge(3600); // 1 hour
+                cookie.setMaxAge((int)(jwtExpirationMs / 1000)); // Convert ms to seconds for cookie
                 response.addCookie(cookie);
 
                 // Set refresh token in a different cookie
@@ -57,7 +64,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 refreshCookie.setHttpOnly(true);
                 refreshCookie.setSecure(false); // Set to true in production
                 refreshCookie.setPath("/refresh-token");
-                refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+                refreshCookie.setMaxAge((int)(refreshTokenExpirationMs / 1000)); // Convert ms to seconds
                 response.addCookie(refreshCookie);
 
                 // Redirect to frontend home page

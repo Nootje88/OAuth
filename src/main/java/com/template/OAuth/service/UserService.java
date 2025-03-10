@@ -2,6 +2,7 @@ package com.template.OAuth.service;
 
 import com.template.OAuth.entities.User;
 import com.template.OAuth.enums.AuthProvider;
+import com.template.OAuth.enums.NotificationType;
 import com.template.OAuth.enums.Role;
 import com.template.OAuth.repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +36,9 @@ public class UserService {
             // Update profile info if needed
             user.setName(oidcUser.getFullName());
             user.setPicture(oidcUser.getPicture());
+
+            // Record login
+            user.recordLogin();
         } else {
             // Create new user
             user = new User();
@@ -49,11 +54,57 @@ public class UserService {
             if ("admin@yourdomain.com".equals(email) || "diasnino@gmail.com".equals(email)) {
                 user.addRole(Role.ADMIN);
             }
+
+            // Initialize default notification preferences
+            user.enableNotification(NotificationType.EMAIL_SECURITY);
+            user.enableNotification(NotificationType.PUSH_GENERAL);
+            user.enableNotification(NotificationType.IN_APP_GENERAL);
+
+            // Record first login
+            user.recordLogin();
         }
 
         setProviderId(user, authProvider, providerId);
         return userRepository.save(user);
     }
+
+    // Existing methods...
+
+    // New methods for extended user profile functionality
+
+    /**
+     * Record that a user has performed some activity
+     */
+    @Transactional
+    public void recordUserActivity(User user) {
+        user.recordActivity();
+        userRepository.save(user);
+    }
+
+    /**
+     * Save a user entity to the database
+     */
+    @Transactional
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
+
+    /**
+     * Get currently authenticated user
+     */
+    @Transactional(readOnly = true)
+    public User getCurrentUser() {
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        String email = securityContext.getAuthentication().getName();
+        return findUserByEmail(email);
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> findAllUsers() {
+        return userRepository.findAll();
+    }
+
+    // Add original/existing methods from your UserService here...
 
     private AuthProvider determineAuthProvider(String providerName) {
         // Convert the provider name/URL to a supported enum value
@@ -84,7 +135,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
     }
 
-    // New methods for role management
+    // Role management methods
     @Transactional
     public User assignRole(String email, Role role) {
         User user = findUserByEmail(email);
@@ -97,17 +148,5 @@ public class UserService {
         User user = findUserByEmail(email);
         user.getRoles().remove(role);
         return userRepository.save(user);
-    }
-
-    @Transactional(readOnly = true)
-    public List<User> findAllUsers() {
-        return userRepository.findAll();
-    }
-
-    @Transactional(readOnly = true)
-    public User getCurrentUser() {
-        SecurityContext securityContext = SecurityContextHolder.getContext();
-        String email = securityContext.getAuthentication().getName();
-        return findUserByEmail(email);
     }
 }
