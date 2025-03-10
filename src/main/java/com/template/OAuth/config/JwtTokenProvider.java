@@ -11,16 +11,15 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtTokenProvider {
 
     private final String jwtSecret;
     private final long jwtExpirationMs = 3600000; // 1 hour
-    private final UserDetailsService userDetailsService; // ✅ Inject UserDetailsService
+    private final UserDetailsService userDetailsService;
 
     public JwtTokenProvider(UserDetailsService userDetailsService) {
         Dotenv dotenv = Dotenv.load();
@@ -33,8 +32,16 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(String email) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+
+        // Extract roles from authorities
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .collect(Collectors.toList());
+
         return Jwts.builder()
                 .setSubject(email)
+                .claim("roles", roles)  // Add roles to JWT claims
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
