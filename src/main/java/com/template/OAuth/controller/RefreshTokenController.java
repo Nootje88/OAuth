@@ -1,6 +1,8 @@
 package com.template.OAuth.controller;
 
+import com.template.OAuth.annotation.Auditable;
 import com.template.OAuth.dto.RefreshTokenResponse;
+import com.template.OAuth.enums.AuditEventType;
 import com.template.OAuth.service.RefreshTokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +23,7 @@ public class RefreshTokenController {
     }
 
     @PostMapping
+    @Auditable(type = AuditEventType.TOKEN_REFRESH, description = "User refreshed token")
     public ResponseEntity<RefreshTokenResponse> refreshAccessToken(HttpServletRequest request, HttpServletResponse response) {
         Cookie[] cookies = request.getCookies();
         String refreshToken = null;

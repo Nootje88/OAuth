@@ -30,7 +30,9 @@ logging:
     org.springframework.security: DEBUG
     com.template.OAuth: DEBUG
     org.hibernate.SQL: DEBUG
+    com.template.OAuth.service.AuditService: DEBUG
 
 # Disable caching for templates and static resources
 spring.thymeleaf.cache: false
 spring.resources.cache.period: 0
+

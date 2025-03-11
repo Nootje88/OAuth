@@ -24,6 +24,7 @@ logging:
   level:
     root: WARN
     com.template.OAuth: INFO
+    com.template.OAuth.service.AuditService: DEBUG
 
 # SSL configuration for PAT
 server:

@@ -1,7 +1,9 @@
 package com.template.OAuth.controller;
 
+import com.template.OAuth.annotation.Auditable;
 import com.template.OAuth.dto.UserDto;
 import com.template.OAuth.entities.User;
+import com.template.OAuth.enums.AuditEventType;
 import com.template.OAuth.enums.Role;
 import com.template.OAuth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,6 +47,7 @@ public class AdminController {
     })
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/assign-role")
+    @Auditable(type = AuditEventType.USER_ROLE_CHANGED, description = "Admin assigned role to user", includeArgs = true)
     public ResponseEntity<String> assignRole(
             @Parameter(description = "User email", required = true)
             @RequestParam String email,
@@ -68,6 +71,7 @@ public class AdminController {
     })
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/remove-role")
+    @Auditable(type = AuditEventType.USER_ROLE_CHANGED, description = "Admin removed role from user", includeArgs = true)
     public ResponseEntity<String> removeRole(
             @Parameter(description = "User email", required = true)
             @RequestParam String email,

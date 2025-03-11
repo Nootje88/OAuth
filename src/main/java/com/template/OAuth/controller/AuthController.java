@@ -1,12 +1,15 @@
-package com.template.OAuth.contoller;
+package com.template.OAuth.controller;
 
+import com.template.OAuth.annotation.Auditable;
 import com.template.OAuth.config.JwtTokenProvider;
 import com.template.OAuth.dto.AuthResponse;
 import com.template.OAuth.dto.UserLoginRequest;
 import com.template.OAuth.entities.User;
+import com.template.OAuth.enums.AuditEventType;
 import com.template.OAuth.enums.AuthProvider;
 import com.template.OAuth.repositories.RefreshTokenRepository;
 import com.template.OAuth.repositories.UserRepository;
+import com.template.OAuth.service.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -18,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,13 +36,16 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AuditService auditService;
 
     public AuthController(JwtTokenProvider jwtTokenProvider,
                           UserRepository userRepository,
-                          RefreshTokenRepository refreshTokenRepository) {
+                          RefreshTokenRepository refreshTokenRepository,
+                          AuditService auditService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.auditService = auditService;
     }
 
     @Operation(summary = "Authenticate user",
@@ -51,6 +58,7 @@ public class AuthController {
     })
     @SecurityRequirements // No security requirements for login endpoint
     @PostMapping("/login")
+    @Auditable(type = AuditEventType.LOGIN_SUCCESS, description = "User login")
     public ResponseEntity<AuthResponse> authenticateUser(
             @Parameter(description = "User login details", required = true)
             @RequestBody UserLoginRequest loginRequest,
@@ -59,6 +67,7 @@ public class AuthController {
         Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
 
         User user;
+        boolean isNewUser = false;
         if (userOpt.isPresent()) {
             user = userOpt.get();
         } else {
@@ -67,7 +76,13 @@ public class AuthController {
             user.setName(loginRequest.getName());
             user.setPicture(loginRequest.getPicture());
             user.setPrimaryProvider(AuthProvider.GOOGLE);
+            isNewUser = true;
             userRepository.save(user);
+
+            // Audit new user creation
+            auditService.logEvent(AuditEventType.USER_CREATED,
+                    "New user registered",
+                    "Email: " + user.getEmail());
         }
 
         String token = jwtTokenProvider.generateToken(user.getEmail());
@@ -78,6 +93,11 @@ public class AuthController {
         cookie.setPath("/");
         cookie.setMaxAge(3600); // 1 hour expiration
         response.addCookie(cookie);
+
+        // Audit successful login
+        auditService.logEvent(AuditEventType.LOGIN_SUCCESS,
+                "User logged in successfully",
+                "Email: " + user.getEmail());
 
         return ResponseEntity.ok(new AuthResponse(token, "Login successful"));
     }
@@ -117,7 +137,19 @@ public class AuthController {
                     content = @Content)
     })
     @PostMapping("/logout")
+    @Auditable(type = AuditEventType.LOGOUT, description = "User logout")
     public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
+        // Get current user email from the token for audit logging
+        String userEmail = "anonymous";
+        Optional<String> tokenOpt = jwtTokenProvider.getTokenFromRequest(request);
+        if (tokenOpt.isPresent()) {
+            try {
+                userEmail = jwtTokenProvider.getEmailFromToken(tokenOpt.get());
+            } catch (Exception e) {
+                // Token might be invalid, just continue with logout
+            }
+        }
+
         // Clear JWT cookie
         Cookie jwtCookie = new Cookie("jwt", null);
         jwtCookie.setHttpOnly(true);
@@ -134,17 +166,15 @@ public class AuthController {
         refreshCookie.setMaxAge(0);
         response.addCookie(refreshCookie);
 
-        // Get current user email from the token
-        Optional<String> tokenOpt = jwtTokenProvider.getTokenFromRequest(request);
-        if (tokenOpt.isPresent()) {
-            try {
-                String email = jwtTokenProvider.getEmailFromToken(tokenOpt.get());
-                // Clean up refresh tokens for this user
-                userRepository.findByEmail(email).ifPresent(user ->
-                        refreshTokenRepository.deleteByUser(user));
-            } catch (Exception e) {
-                // Token might be invalid, just continue with logout
-            }
+        // Clean up refresh tokens for this user
+        if (!"anonymous".equals(userEmail)) {
+            userRepository.findByEmail(userEmail).ifPresent(user ->
+                    refreshTokenRepository.deleteByUser(user));
+
+            // Audit logout event
+            auditService.logEvent(AuditEventType.LOGOUT,
+                    "User logged out successfully",
+                    "Email: " + userEmail);
         }
 
         return ResponseEntity.ok("Logged out successfully");

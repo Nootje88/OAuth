@@ -24,6 +24,7 @@ logging:
   level:
     root: INFO
     com.template.OAuth: DEBUG
+    com.template.OAuth.service.AuditService: DEBUG
 
 # Disable OAuth for testing
 spring:
