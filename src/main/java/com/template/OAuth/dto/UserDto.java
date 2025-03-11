@@ -16,4 +16,5 @@ public class UserDto {
     private String picture;
     private AuthProvider primaryProvider;
     private Set<Role> roles;
+    private String languagePreference;
 }

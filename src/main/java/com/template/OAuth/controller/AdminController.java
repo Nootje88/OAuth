@@ -5,6 +5,7 @@ import com.template.OAuth.dto.UserDto;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.enums.AuditEventType;
 import com.template.OAuth.enums.Role;
+import com.template.OAuth.service.MessageService;
 import com.template.OAuth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,11 +15,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -29,9 +33,12 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final UserService userService;
+    private final MessageService messageService;
 
-    public AdminController(UserService userService) {
+    @Autowired
+    public AdminController(UserService userService, MessageService messageService) {
         this.userService = userService;
+        this.messageService = messageService;
     }
 
     @Operation(summary = "Assign role to user",
@@ -48,14 +55,20 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/assign-role")
     @Auditable(type = AuditEventType.USER_ROLE_CHANGED, description = "Admin assigned role to user", includeArgs = true)
-    public ResponseEntity<String> assignRole(
+    public ResponseEntity<Map<String, String>> assignRole(
             @Parameter(description = "User email", required = true)
             @RequestParam String email,
             @Parameter(description = "Role to assign", required = true,
                     schema = @Schema(implementation = Role.class))
             @RequestParam Role role) {
         userService.assignRole(email, role);
-        return ResponseEntity.ok("Role " + role + " assigned to user " + email);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", messageService.getMessage("user.role.assigned"));
+        response.put("email", email);
+        response.put("role", role.name());
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Remove role from user",
@@ -72,14 +85,20 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/remove-role")
     @Auditable(type = AuditEventType.USER_ROLE_CHANGED, description = "Admin removed role from user", includeArgs = true)
-    public ResponseEntity<String> removeRole(
+    public ResponseEntity<Map<String, String>> removeRole(
             @Parameter(description = "User email", required = true)
             @RequestParam String email,
             @Parameter(description = "Role to remove", required = true,
                     schema = @Schema(implementation = Role.class))
             @RequestParam Role role) {
         userService.removeRole(email, role);
-        return ResponseEntity.ok("Role " + role + " removed from user " + email);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", messageService.getMessage("user.role.removed"));
+        response.put("email", email);
+        response.put("role", role.name());
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Get all users",
@@ -112,8 +131,11 @@ public class AdminController {
     })
     @PreAuthorize("hasRole('PREMIUM')")
     @GetMapping("/premium/content")
-    public ResponseEntity<String> getPremiumContent() {
-        return ResponseEntity.ok("This is premium content available only to premium users");
+    public ResponseEntity<Map<String, String>> getPremiumContent() {
+        Map<String, String> response = new HashMap<>();
+        response.put("message", messageService.getMessage("app.welcome"));
+        response.put("content", "This is premium content available only to premium users");
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Get user profile",

@@ -10,6 +10,7 @@ import com.template.OAuth.enums.AuthProvider;
 import com.template.OAuth.repositories.RefreshTokenRepository;
 import com.template.OAuth.repositories.UserRepository;
 import com.template.OAuth.service.AuditService;
+import com.template.OAuth.service.MessageService;
 import com.template.OAuth.service.MetricsService;
 import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +28,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -40,18 +43,21 @@ public class AuthController {
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuditService auditService;
     private final MetricsService metricsService;
+    private final MessageService messageService;
 
     @Autowired
     public AuthController(JwtTokenProvider jwtTokenProvider,
                           UserRepository userRepository,
                           RefreshTokenRepository refreshTokenRepository,
                           AuditService auditService,
-                          MetricsService metricsService) {
+                          MetricsService metricsService,
+                          MessageService messageService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.auditService = auditService;
         this.metricsService = metricsService;
+        this.messageService = messageService;
     }
 
     @Operation(summary = "Authenticate user",
@@ -91,7 +97,7 @@ public class AuthController {
 
             // Audit new user creation
             auditService.logEvent(AuditEventType.USER_CREATED,
-                    "New user registered",
+                    messageService.getMessage("user.created"),
                     "Email: " + user.getEmail());
         }
 
@@ -109,10 +115,10 @@ public class AuthController {
 
         // Audit successful login
         auditService.logEvent(AuditEventType.LOGIN_SUCCESS,
-                "User logged in successfully",
+                messageService.getMessage("auth.login.success"),
                 "Email: " + user.getEmail());
 
-        return ResponseEntity.ok(new AuthResponse(token, "Login successful"));
+        return ResponseEntity.ok(new AuthResponse(token, messageService.getMessage("auth.login.success")));
     }
 
     @Operation(summary = "Get current user",
@@ -143,7 +149,9 @@ public class AuthController {
         // Record metrics for unauthorized access
         metricsService.incrementError("unauthorized");
 
-        return ResponseEntity.status(401).body("Unauthorized");
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("message", messageService.getMessage("auth.access.denied"));
+        return ResponseEntity.status(401).body(errorResponse);
     }
 
     @Operation(summary = "Logout",
@@ -156,7 +164,7 @@ public class AuthController {
     @PostMapping("/logout")
     @Auditable(type = AuditEventType.LOGOUT, description = "User logout")
     @Timed(value = "auth.logout.time", description = "Time taken to logout")
-    public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response) {
         // Get current user email from the token for audit logging
         String userEmail = "anonymous";
         Optional<String> tokenOpt = jwtTokenProvider.getTokenFromRequest(request);
@@ -194,11 +202,13 @@ public class AuthController {
 
             // Audit logout event
             auditService.logEvent(AuditEventType.LOGOUT,
-                    "User logged out successfully",
+                    messageService.getMessage("auth.logout.success"),
                     "Email: " + userEmail);
         }
 
-        return ResponseEntity.ok("Logged out successfully");
+        Map<String, String> responseMap = new HashMap<>();
+        responseMap.put("message", messageService.getMessage("auth.logout.success"));
+        return ResponseEntity.ok(responseMap);
     }
 
     @Operation(summary = "Get login URL",

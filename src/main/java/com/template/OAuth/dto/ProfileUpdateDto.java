@@ -34,4 +34,9 @@ public class ProfileUpdateDto {
     @Schema(description = "User's preferred application theme", example = "DARK",
             allowableValues = {"LIGHT", "DARK", "SYSTEM"})
     private ThemePreference themePreference;
+
+    @Pattern(regexp = "^(en|es|fr|de)$", message = "Language must be one of: en, es, fr, de")
+    @Schema(description = "User's preferred language", example = "en",
+            allowableValues = {"en", "es", "fr", "de"})
+    private String languagePreference;
 }

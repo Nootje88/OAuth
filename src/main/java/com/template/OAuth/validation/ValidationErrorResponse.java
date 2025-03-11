@@ -8,6 +8,7 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -16,13 +17,17 @@ import java.util.Map;
 public class ValidationErrorResponse {
     private List<String> errors = new ArrayList<>();
     private String message;
+    private Map<String, String> fieldErrors;
 
     public ValidationErrorResponse(String message) {
         this.message = message;
     }
 
-    public ValidationErrorResponse(Map<String, String> errorMap) {
-        this.message = "Validation failed";
-        errorMap.forEach((field, error) -> errors.add(field + ": " + error));
+    public ValidationErrorResponse(String message, Map<String, String> errorMap) {
+        this.message = message;
+        this.fieldErrors = errorMap;
+        this.errors = errorMap.entrySet().stream()
+                .map(entry -> entry.getKey() + ": " + entry.getValue())
+                .collect(Collectors.toList());
     }
 }

@@ -62,6 +62,10 @@ public class User {
     private String phoneNumber;
     private String alternativeEmail;
 
+    // Language preference for internationalization
+    @Column(length = 10)
+    private String languagePreference = "en"; // Default to English
+
     // User preferences
     @Enumerated(EnumType.STRING)
     private ThemePreference themePreference = ThemePreference.SYSTEM;

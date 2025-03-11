@@ -8,11 +8,14 @@ import com.template.OAuth.dto.ProfileUpdateHistoryDto;
 import com.template.OAuth.entities.ProfileUpdateHistory;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.repositories.ProfileUpdateHistoryRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.LocaleResolver;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -35,6 +39,15 @@ public class ProfileService {
 
     @Autowired
     private AppProperties appProperties;
+
+    @Autowired
+    private LocaleResolver localeResolver;
+
+    @Autowired
+    private HttpServletRequest request;
+
+    @Autowired
+    private HttpServletResponse response;
 
     @Transactional
     public User updateProfile(ProfileUpdateDto profileUpdateDto) {
@@ -79,6 +92,21 @@ public class ProfileService {
                     currentUser.getThemePreference() != null ? currentUser.getThemePreference().name() : null,
                     profileUpdateDto.getThemePreference().name());
             currentUser.setThemePreference(profileUpdateDto.getThemePreference());
+        }
+
+        // Handle language preference update
+        if (profileUpdateDto.getLanguagePreference() != null &&
+                !profileUpdateDto.getLanguagePreference().equals(currentUser.getLanguagePreference())) {
+
+            currentUser.addUpdateHistory("languagePreference",
+                    currentUser.getLanguagePreference(),
+                    profileUpdateDto.getLanguagePreference());
+
+            currentUser.setLanguagePreference(profileUpdateDto.getLanguagePreference());
+
+            // Also update the locale for the current session
+            Locale newLocale = Locale.forLanguageTag(profileUpdateDto.getLanguagePreference());
+            localeResolver.setLocale(request, response, newLocale);
         }
 
         // Record user activity
@@ -170,6 +198,7 @@ public class ProfileService {
         // Preferences
         dto.setThemePreference(user.getThemePreference());
         dto.setEnabledNotifications(user.getEnabledNotifications());
+        dto.setLanguagePreference(user.getLanguagePreference());
 
         // Activity information
         dto.setRegistrationDate(user.getRegistrationDate());

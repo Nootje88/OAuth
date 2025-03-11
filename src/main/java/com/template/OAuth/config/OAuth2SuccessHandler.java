@@ -4,6 +4,7 @@ import com.template.OAuth.entities.RefreshToken;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.enums.AuditEventType;
 import com.template.OAuth.service.AuditService;
+import com.template.OAuth.service.MessageService;
 import com.template.OAuth.service.RefreshTokenService;
 import com.template.OAuth.service.UserService;
 import jakarta.servlet.http.Cookie;
@@ -13,8 +14,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.LocaleResolver;
 
 import java.io.IOException;
+import java.util.Locale;
 
 @Component
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
@@ -24,17 +27,23 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final RefreshTokenService refreshTokenService;
     private final AppProperties appProperties;
     private final AuditService auditService;
+    private final MessageService messageService;
+    private final LocaleResolver localeResolver;
 
     public OAuth2SuccessHandler(UserService userService,
                                 JwtTokenProvider jwtTokenProvider,
                                 RefreshTokenService refreshTokenService,
                                 AppProperties appProperties,
-                                AuditService auditService) {
+                                AuditService auditService,
+                                MessageService messageService,
+                                LocaleResolver localeResolver) {
         this.userService = userService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshTokenService = refreshTokenService;
         this.appProperties = appProperties;
         this.auditService = auditService;
+        this.messageService = messageService;
+        this.localeResolver = localeResolver;
         setDefaultTargetUrl("http://localhost:3000/home");
     }
 
@@ -47,6 +56,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             try {
                 // Save or update user in database - this now includes login tracking
                 User user = userService.saveUser(oidcUser, oidcUser.getIssuer().toString(), oidcUser.getSubject());
+
+                // Set the user's preferred language as the locale if it exists
+                if (user.getLanguagePreference() != null && !user.getLanguagePreference().isEmpty()) {
+                    Locale locale = Locale.forLanguageTag(user.getLanguagePreference());
+                    localeResolver.setLocale(request, response, locale);
+                }
 
                 // Generate JWT token
                 String token = jwtTokenProvider.generateToken(user.getEmail());
@@ -74,12 +89,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 boolean isNewUser = user.getLoginCount() == 1;
                 if (isNewUser) {
                     auditService.logEvent(AuditEventType.USER_CREATED,
-                            "New user registered via OAuth",
+                            messageService.getMessage("user.created"),
                             "User: " + user.getEmail() + ", Provider: " + oidcUser.getIssuer().toString());
                 }
 
                 auditService.logEvent(AuditEventType.LOGIN_SUCCESS,
-                        "User logged in via OAuth",
+                        messageService.getMessage("auth.login.success"),
                         "User: " + user.getEmail() + ", Provider: " + oidcUser.getIssuer().toString());
 
                 // Redirect to frontend home page
@@ -89,7 +104,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
                 // Audit login failure
                 auditService.logEvent(AuditEventType.LOGIN_FAILURE,
-                        "OAuth login failed",
+                        messageService.getMessage("auth.login.failure"),
                         "Error: " + e.getMessage());
 
                 response.sendRedirect("http://localhost:3000/login?error=auth");
@@ -99,7 +114,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
             // Audit login failure
             auditService.logEvent(AuditEventType.LOGIN_FAILURE,
-                    "OAuth login failed",
+                    messageService.getMessage("auth.login.failure"),
                     "Error: Authentication principal is not OidcUser");
 
             response.sendRedirect("http://localhost:3000/login?error=type");

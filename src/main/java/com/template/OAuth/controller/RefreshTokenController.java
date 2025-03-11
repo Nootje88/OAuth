@@ -3,10 +3,12 @@ package com.template.OAuth.controller;
 import com.template.OAuth.annotation.Auditable;
 import com.template.OAuth.dto.RefreshTokenResponse;
 import com.template.OAuth.enums.AuditEventType;
+import com.template.OAuth.service.MessageService;
 import com.template.OAuth.service.RefreshTokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,9 +19,12 @@ import org.springframework.web.bind.annotation.*;
 public class RefreshTokenController {
 
     private final RefreshTokenService refreshTokenService;
+    private final MessageService messageService;
 
-    public RefreshTokenController(RefreshTokenService refreshTokenService) {
+    @Autowired
+    public RefreshTokenController(RefreshTokenService refreshTokenService, MessageService messageService) {
         this.refreshTokenService = refreshTokenService;
+        this.messageService = messageService;
     }
 
     @PostMapping
@@ -39,15 +44,21 @@ public class RefreshTokenController {
 
         if (refreshToken == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new RefreshTokenResponse(null, null, "No refresh token found"));
+                    .body(new RefreshTokenResponse(null, null, messageService.getMessage("auth.token.invalid")));
         }
 
         try {
             RefreshTokenResponse refreshResponse = refreshTokenService.refreshToken(refreshToken, response);
+            // Update the message to use internationalization
+            refreshResponse.setMessage(messageService.getMessage("auth.login.success"));
             return ResponseEntity.ok(refreshResponse);
         } catch (Exception e) {
+            String messageKey = "auth.token.expired";
+            if (e.getMessage() != null && e.getMessage().contains("Invalid")) {
+                messageKey = "auth.token.invalid";
+            }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new RefreshTokenResponse(null, null, e.getMessage()));
+                    .body(new RefreshTokenResponse(null, null, messageService.getMessage(messageKey)));
         }
     }
 }

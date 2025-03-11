@@ -30,6 +30,9 @@ public class ExtendedUserDto {
     private ThemePreference themePreference;
     private Set<NotificationType> enabledNotifications;
 
+    // Language preference
+    private String languagePreference;
+
     // Activity information
     private Instant registrationDate;
     private Instant lastLoginDate;
