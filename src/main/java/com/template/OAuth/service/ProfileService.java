@@ -1,5 +1,6 @@
 package com.template.OAuth.service;
 
+import com.template.OAuth.config.AppProperties;
 import com.template.OAuth.dto.ExtendedUserDto;
 import com.template.OAuth.dto.NotificationPreferencesDto;
 import com.template.OAuth.dto.ProfileUpdateDto;
@@ -8,7 +9,6 @@ import com.template.OAuth.entities.ProfileUpdateHistory;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.repositories.ProfileUpdateHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,8 +33,8 @@ public class ProfileService {
     @Autowired
     private ProfileUpdateHistoryRepository profileUpdateHistoryRepository;
 
-    @Value("${app.profile.upload-dir:uploads/profiles}")
-    private String uploadDir;
+    @Autowired
+    private AppProperties appProperties;
 
     @Transactional
     public User updateProfile(ProfileUpdateDto profileUpdateDto) {
@@ -46,9 +46,17 @@ public class ProfileService {
             currentUser.setName(profileUpdateDto.getName());
         }
 
-        if (profileUpdateDto.getBiography() != null && !profileUpdateDto.getBiography().equals(currentUser.getBiography())) {
-            currentUser.addUpdateHistory("biography", currentUser.getBiography(), profileUpdateDto.getBiography());
-            currentUser.setBiography(profileUpdateDto.getBiography());
+        if (profileUpdateDto.getBiography() != null) {
+            // Apply max biography length constraint from application properties
+            String biography = profileUpdateDto.getBiography();
+            if (biography.length() > appProperties.getProfile().getMaxBioLength()) {
+                biography = biography.substring(0, appProperties.getProfile().getMaxBioLength());
+            }
+
+            if (!biography.equals(currentUser.getBiography())) {
+                currentUser.addUpdateHistory("biography", currentUser.getBiography(), biography);
+                currentUser.setBiography(biography);
+            }
         }
 
         if (profileUpdateDto.getLocation() != null && !profileUpdateDto.getLocation().equals(currentUser.getLocation())) {
@@ -103,7 +111,7 @@ public class ProfileService {
         User currentUser = userService.getCurrentUser();
 
         // 1. Create upload directory if it doesn't exist
-        Path uploadPath = Paths.get(uploadDir);
+        Path uploadPath = Paths.get(appProperties.getProfile().getUploadDir());
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }

@@ -5,7 +5,6 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
@@ -19,16 +18,14 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private final String jwtSecret;
-
-    @Value("${app.security.jwt.expiration:3600000}")
-    private long jwtExpirationMs; // Default: 1 hour
-
     private final UserDetailsService userDetailsService;
+    private final AppProperties appProperties;
 
-    public JwtTokenProvider(UserDetailsService userDetailsService) {
+    public JwtTokenProvider(UserDetailsService userDetailsService, AppProperties appProperties) {
         Dotenv dotenv = Dotenv.load();
         this.jwtSecret = dotenv.get("JWT_SECRET");
         this.userDetailsService = userDetailsService;
+        this.appProperties = appProperties;
     }
 
     private Key getSigningKey() {
@@ -47,7 +44,7 @@ public class JwtTokenProvider {
                 .setSubject(email)
                 .claim("roles", roles)  // Add roles to JWT claims
                 .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .setExpiration(new Date((new Date()).getTime() + appProperties.getSecurity().getJwt().getExpiration()))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

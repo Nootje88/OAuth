@@ -7,7 +7,6 @@ import com.template.OAuth.service.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -21,17 +20,16 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+    private final AppProperties appProperties;
 
-    @Value("${app.security.jwt.expiration:3600000}")
-    private long jwtExpirationMs; // Default: 1 hour
-
-    @Value("${app.security.refresh.expiration:604800000}")
-    private long refreshTokenExpirationMs; // Default: 7 days
-
-    public OAuth2SuccessHandler(UserService userService, JwtTokenProvider jwtTokenProvider, RefreshTokenService refreshTokenService) {
+    public OAuth2SuccessHandler(UserService userService,
+                                JwtTokenProvider jwtTokenProvider,
+                                RefreshTokenService refreshTokenService,
+                                AppProperties appProperties) {
         this.userService = userService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshTokenService = refreshTokenService;
+        this.appProperties = appProperties;
         setDefaultTargetUrl("http://localhost:3000/home");
     }
 
@@ -54,17 +52,17 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 // Set JWT in HTTP-only cookie
                 Cookie cookie = new Cookie("jwt", token);
                 cookie.setHttpOnly(true);
-                cookie.setSecure(false); // Set to true in production
+                cookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
                 cookie.setPath("/");
-                cookie.setMaxAge((int)(jwtExpirationMs / 1000)); // Convert ms to seconds for cookie
+                cookie.setMaxAge((int)(appProperties.getSecurity().getJwt().getExpiration() / 1000));
                 response.addCookie(cookie);
 
                 // Set refresh token in a different cookie
                 Cookie refreshCookie = new Cookie("refresh_token", refreshToken.getToken());
                 refreshCookie.setHttpOnly(true);
-                refreshCookie.setSecure(false); // Set to true in production
+                refreshCookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
                 refreshCookie.setPath("/refresh-token");
-                refreshCookie.setMaxAge((int)(refreshTokenExpirationMs / 1000)); // Convert ms to seconds
+                refreshCookie.setMaxAge((int)(appProperties.getSecurity().getRefresh().getExpiration() / 1000));
                 response.addCookie(refreshCookie);
 
                 // Redirect to frontend home page

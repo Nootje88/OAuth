@@ -1,5 +1,6 @@
 package com.template.OAuth.service;
 
+import com.template.OAuth.config.AppProperties;
 import com.template.OAuth.config.JwtTokenProvider;
 import com.template.OAuth.config.RefreshTokenProvider;
 import com.template.OAuth.dto.RefreshTokenResponse;
@@ -10,7 +11,6 @@ import com.template.OAuth.repositories.UserRepository;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -31,11 +31,8 @@ public class RefreshTokenService {
     @Autowired
     private RefreshTokenProvider refreshTokenProvider;
 
-    @Value("${app.security.jwt.expiration:3600000}")
-    private long jwtExpirationMs; // Default: 1 hour
-
-    @Value("${app.security.refresh.expiration:604800000}")
-    private long refreshTokenExpirationMs; // Default: 7 days
+    @Autowired
+    private AppProperties appProperties;
 
     @Transactional
     public RefreshToken generateRefreshToken(User user) {
@@ -46,14 +43,14 @@ public class RefreshTokenService {
             // Update existing token instead of creating a new one
             RefreshToken refreshToken = existingToken.get();
             refreshToken.setToken(refreshTokenProvider.generateRefreshToken());
-            refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenExpirationMs));
+            refreshToken.setExpiryDate(Instant.now().plusMillis(appProperties.getSecurity().getRefresh().getExpiration()));
             return refreshTokenRepository.save(refreshToken);
         } else {
             // Create new token
             RefreshToken refreshToken = new RefreshToken();
             refreshToken.setUser(user);
             refreshToken.setToken(refreshTokenProvider.generateRefreshToken());
-            refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenExpirationMs));
+            refreshToken.setExpiryDate(Instant.now().plusMillis(appProperties.getSecurity().getRefresh().getExpiration()));
             return refreshTokenRepository.save(refreshToken);
         }
     }
@@ -76,23 +73,24 @@ public class RefreshTokenService {
             // Issue new refresh token
             String newRefreshToken = refreshTokenProvider.generateRefreshToken();
             refreshToken.setToken(newRefreshToken);
-            refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenExpirationMs));
+            refreshToken.setExpiryDate(Instant.now().plusMillis(appProperties.getSecurity().getRefresh().getExpiration()));
             refreshTokenRepository.save(refreshToken);
 
             // Store in HTTP-only cookie
             Cookie cookie = new Cookie("jwt", newAccessToken);
             cookie.setHttpOnly(true);
-            cookie.setSecure(false); // Set to true in production
+            cookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
             cookie.setPath("/");
-            cookie.setMaxAge((int)(jwtExpirationMs / 1000)); // Convert ms to seconds for cookie
+            cookie.setMaxAge((int)(appProperties.getSecurity().getJwt().getExpiration() / 1000));
             response.addCookie(cookie);
 
             // Set refresh token in a different cookie
             Cookie refreshCookie = new Cookie("refresh_token", newRefreshToken);
             refreshCookie.setHttpOnly(true);
-            refreshCookie.setSecure(false); // Set to true in production
+            refreshCookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
+            cookie.setAttribute("SameSite", appProperties.getSecurity().getCookie().getSameSite());
             refreshCookie.setPath("/refresh-token");
-            refreshCookie.setMaxAge((int)(refreshTokenExpirationMs / 1000)); // Convert ms to seconds
+            refreshCookie.setMaxAge((int)(appProperties.getSecurity().getRefresh().getExpiration() / 1000));
             response.addCookie(refreshCookie);
 
             return new RefreshTokenResponse(newAccessToken, newRefreshToken, "Token refreshed successfully");

@@ -1,20 +1,19 @@
+# Common configuration shared across all profiles
 spring:
   config:
     import: optional:file:.env[.properties]  # Load environment variables
+  profiles:
+    active: dev  # Default profile is development
   datasource:
-    url: jdbc:mysql://localhost:3306/OAuthTemplate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        ddl-auto: update
-    generate-ddl: true
-  sql:
-    init:
-      mode: never
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   security:
     oauth2:
       client:
@@ -27,11 +26,6 @@ spring:
               - openid
               - profile
               - email
-  # Multipart file settings for profile picture uploads
-  servlet:
-    multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
 
 #          spotify:
 #            client-id: ${SPOTIFY_CLIENT_ID}
@@ -47,18 +41,36 @@ spring:
 
 server:
   port: 8080
-  forward-headers-strategy: framework # ✅ Ensures correct forwarding headers
+  forward-headers-strategy: framework
 
-# Logging configuration for debugging
-logging:
-  level:
-    org.springframework.security: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.web.cors: DEBUG
-
-# User profile configuration
+# Common application settings
 app:
+  security:
+    jwt:
+      expiration: 3600000         # JWT token expiration time in milliseconds (1 hour)
+    refresh:
+      expiration: 604800000       # Refresh token expiration time (7 days)
   profile:
-    upload-dir: uploads/profiles  # Directory for storing profile pictures
     max-bio-length: 500           # Maximum biography length in characters
-    default-theme: SYSTEM         # Default theme preference (LIGHT, DARK, or SYSTEM)
+    default-theme: SYSTEM         # Default theme preference
+
+
+# Replace your current springdoc configuration with this
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+    csrf:
+      enabled: true
+    try-it-out-enabled: true
+    filter: true
+    syntax-highlight:
+      activated: true
+    deepLinking: true
+  api-docs:
+    path: /api-docs
+    groups:
+      enabled: true
+  show-actuator: false
+  packages-to-scan: com.template.OAuth.controller
+  paths-to-match: /api/**, /auth/**, /refresh-token

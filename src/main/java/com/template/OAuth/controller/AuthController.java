@@ -7,14 +7,18 @@ import com.template.OAuth.entities.User;
 import com.template.OAuth.enums.AuthProvider;
 import com.template.OAuth.repositories.RefreshTokenRepository;
 import com.template.OAuth.repositories.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
@@ -22,21 +26,36 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/auth")
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
+@Tag(name = "Authentication", description = "Authentication management endpoints")
 public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    public AuthController(JwtTokenProvider jwtTokenProvider, UserRepository userRepository,
+    public AuthController(JwtTokenProvider jwtTokenProvider,
+                          UserRepository userRepository,
                           RefreshTokenRepository refreshTokenRepository) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
+    @Operation(summary = "Authenticate user",
+            description = "Authenticates a user with provided credentials from OAuth providers")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Authentication successful",
+                    content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid credentials",
+                    content = @Content)
+    })
+    @SecurityRequirements // No security requirements for login endpoint
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> authenticateUser(@RequestBody UserLoginRequest loginRequest, HttpServletResponse response) {
+    public ResponseEntity<AuthResponse> authenticateUser(
+            @Parameter(description = "User login details", required = true)
+            @RequestBody UserLoginRequest loginRequest,
+            HttpServletResponse response) {
+
         Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
 
         User user;
@@ -63,9 +82,16 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(token, "Login successful"));
     }
 
+    @Operation(summary = "Get current user",
+            description = "Retrieves the current authenticated user from the JWT token")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User found",
+                    content = @Content(schema = @Schema(implementation = User.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Not authenticated",
+                    content = @Content)
+    })
     @GetMapping("/user")
     public ResponseEntity<?> getUserFromToken(HttpServletRequest request) {
-        // Try to get token from cookies
         Optional<String> tokenOpt = jwtTokenProvider.getTokenFromRequest(request);
 
         if (tokenOpt.isPresent()) {
@@ -80,10 +106,16 @@ public class AuthController {
             }
         }
 
-        // Don't try to get user from OAuth context, just return 401
         return ResponseEntity.status(401).body("Unauthorized");
     }
 
+    @Operation(summary = "Logout",
+            description = "Logs out the current user by clearing auth cookies")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully logged out"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Not authenticated",
+                    content = @Content)
+    })
     @PostMapping("/logout")
     public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
         // Clear JWT cookie
@@ -118,7 +150,12 @@ public class AuthController {
         return ResponseEntity.ok("Logged out successfully");
     }
 
-    // Add simple endpoint to get the login URL
+    @Operation(summary = "Get login URL",
+            description = "Returns the URL for OAuth2 authentication")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Login URL retrieved successfully")
+    })
+    @SecurityRequirements // No security requirements for login URL endpoint
     @GetMapping("/login-url")
     public ResponseEntity<String> getLoginUrl() {
         return ResponseEntity.ok("/oauth2/authorization/google");
