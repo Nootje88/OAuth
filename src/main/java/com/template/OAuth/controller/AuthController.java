@@ -10,6 +10,8 @@ import com.template.OAuth.enums.AuthProvider;
 import com.template.OAuth.repositories.RefreshTokenRepository;
 import com.template.OAuth.repositories.UserRepository;
 import com.template.OAuth.service.AuditService;
+import com.template.OAuth.service.MetricsService;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -37,15 +39,19 @@ public class AuthController {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuditService auditService;
+    private final MetricsService metricsService;
 
+    @Autowired
     public AuthController(JwtTokenProvider jwtTokenProvider,
                           UserRepository userRepository,
                           RefreshTokenRepository refreshTokenRepository,
-                          AuditService auditService) {
+                          AuditService auditService,
+                          MetricsService metricsService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.auditService = auditService;
+        this.metricsService = metricsService;
     }
 
     @Operation(summary = "Authenticate user",
@@ -59,6 +65,7 @@ public class AuthController {
     @SecurityRequirements // No security requirements for login endpoint
     @PostMapping("/login")
     @Auditable(type = AuditEventType.LOGIN_SUCCESS, description = "User login")
+    @Timed(value = "auth.login.time", description = "Time taken to perform login")
     public ResponseEntity<AuthResponse> authenticateUser(
             @Parameter(description = "User login details", required = true)
             @RequestBody UserLoginRequest loginRequest,
@@ -79,6 +86,9 @@ public class AuthController {
             isNewUser = true;
             userRepository.save(user);
 
+            // Record metrics for new user registration
+            metricsService.incrementRegistration();
+
             // Audit new user creation
             auditService.logEvent(AuditEventType.USER_CREATED,
                     "New user registered",
@@ -93,6 +103,9 @@ public class AuthController {
         cookie.setPath("/");
         cookie.setMaxAge(3600); // 1 hour expiration
         response.addCookie(cookie);
+
+        // Record metrics for successful login
+        metricsService.incrementAuthSuccess();
 
         // Audit successful login
         auditService.logEvent(AuditEventType.LOGIN_SUCCESS,
@@ -111,6 +124,7 @@ public class AuthController {
                     content = @Content)
     })
     @GetMapping("/user")
+    @Timed(value = "auth.get-user.time", description = "Time taken to get current user")
     public ResponseEntity<?> getUserFromToken(HttpServletRequest request) {
         Optional<String> tokenOpt = jwtTokenProvider.getTokenFromRequest(request);
 
@@ -126,6 +140,9 @@ public class AuthController {
             }
         }
 
+        // Record metrics for unauthorized access
+        metricsService.incrementError("unauthorized");
+
         return ResponseEntity.status(401).body("Unauthorized");
     }
 
@@ -138,6 +155,7 @@ public class AuthController {
     })
     @PostMapping("/logout")
     @Auditable(type = AuditEventType.LOGOUT, description = "User logout")
+    @Timed(value = "auth.logout.time", description = "Time taken to logout")
     public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
         // Get current user email from the token for audit logging
         String userEmail = "anonymous";
@@ -170,6 +188,9 @@ public class AuthController {
         if (!"anonymous".equals(userEmail)) {
             userRepository.findByEmail(userEmail).ifPresent(user ->
                     refreshTokenRepository.deleteByUser(user));
+
+            // Record metrics for logout
+            metricsService.incrementLogout();
 
             // Audit logout event
             auditService.logEvent(AuditEventType.LOGOUT,

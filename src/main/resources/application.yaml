@@ -74,3 +74,49 @@ springdoc:
   show-actuator: false
   packages-to-scan: com.template.OAuth.controller
   paths-to-match: /api/**, /auth/**, /refresh-token
+
+# Actuator Configuration (add to your application.yaml)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,env,mappings
+      base-path: /management
+      path-mapping:
+        health: health
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: when_authorized
+      roles: ADMIN
+    info:
+      enabled: true
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    build:
+      enabled: true
+    git:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name:oauth-template}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.9, 0.95, 0.99
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Custom application info
+info:
+  application:
+    name: OAuth Template
+    description: OAuth 2.0 Authentication Service
+    version: 0.0.1-SNAPSHOT
+    environment: ${spring.profiles.active:dev}
