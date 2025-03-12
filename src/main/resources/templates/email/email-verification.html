@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #4285f4;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Verify Your Email Address</h1>
+    </div>
+    <div class="content">
+        <p>Hello <span th:text="${name}">User</span>,</p>
+
+        <p>Thank you for registering! To complete your account setup, please verify your email address by clicking the button below:</p>
+
+        <div style="text-align: center;">
+            <a th:href="${verificationUrl}" class="button">Verify Email Address</a>
+        </div>
+
+        <p>This verification link will expire in <span th:text="${expirationHours}">24</span> hours.</p>
+
+        <p>If you did not create an account, you can safely ignore this email.</p>
+
+        <p>If you're having trouble clicking the button, copy and paste the URL below into your web browser:</p>
+
+        <p style="word-break: break-all; font-size: 12px;"><span th:text="${verificationUrl}">verification_url</span></p>
+    </div>
+    <div class="footer">
+        <p>If you need assistance, please contact our support team at <span th:text="${supportEmail}">support@example.com</span>.</p>
+        <p>&copy; 2025 OAuth Template. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>

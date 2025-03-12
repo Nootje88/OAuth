@@ -62,12 +62,34 @@ app:
       expiration: 3600000         # JWT token expiration time in milliseconds (1 hour)
     refresh:
       expiration: 604800000       # Refresh token expiration time (7 days)
+    verification:
+      expirationHours: 24         # Email verification token expiration time in hours
+    passwordReset:
+      expirationHours: 1          # Password reset token expiration time in hours
+    cookie:
+      secure: false               # Allows cookies over HTTP in dev (set to true in production)
+      sameSite: lax
   profile:
     max-bio-length: 500           # Maximum biography length in characters
     default-theme: SYSTEM         # Default theme preference
+    upload-dir: uploads/profiles  # Profile picture upload directory
+  email:
+    host: ${EMAIL_HOST:smtp.gmail.com}
+    port: ${EMAIL_PORT:587}
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    fromAddress: ${EMAIL_FROM_ADDRESS:no-reply@example.com}
+    fromName: ${EMAIL_FROM_NAME:OAuth Template App}
+    debug: ${EMAIL_DEBUG:false}
+  application:
+    baseUrl: ${APP_BASE_URL:http://localhost:3000}
+    supportEmail: ${SUPPORT_EMAIL:support@example.com}
+    name: ${APP_NAME:OAuth Template}
+  cors:
+    allowedOrigins:
+      - http://localhost:3000
 
-
-# Replace your current springdoc configuration with this
+# Springdoc configuration
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -87,7 +109,7 @@ springdoc:
   packages-to-scan: com.template.OAuth.controller
   paths-to-match: /api/**, /auth/**, /refresh-token
 
-# Actuator Configuration (add to your application.yaml)
+# Actuator Configuration
 management:
   endpoints:
     web:

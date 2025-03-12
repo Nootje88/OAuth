@@ -10,8 +10,14 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
-    // ✅ Find users by their OAuth provider ID
+    // For OAuth provider IDs
     Optional<User> findByGoogleId(String googleId);
     Optional<User> findBySpotifyId(String spotifyId);
     Optional<User> findBySoundcloudId(String soundcloudId);
+
+    // For email verification
+    Optional<User> findByVerificationToken(String token);
+
+    // For password reset
+    Optional<User> findByPasswordResetToken(String token);
 }

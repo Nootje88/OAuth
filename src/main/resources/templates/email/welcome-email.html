@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><!DOCTYPE html>
+      <html xmlns:th="http://www.thymeleaf.org">
+      <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Welcome to OAuth Template</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .content {
+      padding: 20px 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #4285f4;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+    .features {
+      margin: 20px 0;
+      padding: 0;
+    }
+    .features li {
+      margin-bottom: 10px;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      font-size: 12px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Welcome to OAuth Template!</h1>
+  </div>
+  <div class="content">
+    <p>Hello <span th:text="${name}">User</span>,</p>
+
+    <p>Thank you for verifying your email address. Your account has been successfully activated!</p>
+
+    <p>Here are some things you can do with your new account:</p>
+
+    <ul class="features">
+      <li>Manage your profile and preferences</li>
+      <li>Update your notification settings</li>
+      <li>Connect with other OAuth providers</li>
+      <li>Explore our secure authentication features</li>
+    </ul>
+
+    <div style="text-align: center;">
+      <a th:href="${loginUrl}" class="button">Sign In to Your Account</a>
+    </div>
+
+    <p>We're excited to have you on board and look forward to providing you with a great user experience.</p>
+
+    <p>Best regards,<br/>The OAuth Template Team</p>
+  </div>
+  <div class="footer">
+    <p>If you need assistance, please contact our support team at <span th:text="${supportEmail}">support@example.com</span>.</p>
+    <p>&copy; 2025 OAuth Template. All rights reserved.</p>
+  </div>
+</div>
+</body>
+</html></title>
+</head>
+<body>
+
+</body>
+</html>

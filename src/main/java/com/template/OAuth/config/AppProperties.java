@@ -16,6 +16,8 @@ public class AppProperties {
     private Security security = new Security();
     private Profile profile = new Profile();
     private Cors cors = new Cors();
+    private Email email = new Email();
+    private Application application = new Application();
 
     @Getter
     @Setter
@@ -24,6 +26,8 @@ public class AppProperties {
         private Jwt jwt = new Jwt();
         private Refresh refresh = new Refresh();
         private RateLimiting rateLimiting = new RateLimiting();
+        private Verification verification = new Verification();
+        private PasswordReset passwordReset = new PasswordReset();
 
         @Getter
         @Setter
@@ -54,6 +58,18 @@ public class AppProperties {
             private int blockDurationMinutes = 30;
             private int maxFailedAttempts = 5;
         }
+
+        @Getter
+        @Setter
+        public static class Verification {
+            private int expirationHours = 24;
+        }
+
+        @Getter
+        @Setter
+        public static class PasswordReset {
+            private int expirationHours = 1;
+        }
     }
 
     @Getter
@@ -68,5 +84,25 @@ public class AppProperties {
     @Setter
     public static class Cors {
         private List<String> allowedOrigins = List.of("http://localhost:3000");
+    }
+
+    @Getter
+    @Setter
+    public static class Email {
+        private String host = "smtp.gmail.com";
+        private int port = 587;
+        private String username;
+        private String password;
+        private String fromAddress;
+        private String fromName = "OAuth Template App";
+        private boolean debug = false;
+    }
+
+    @Getter
+    @Setter
+    public static class Application {
+        private String baseUrl = "http://localhost:3000";
+        private String supportEmail = "support@example.com";
+        private String name = "OAuth Template";
     }
 }

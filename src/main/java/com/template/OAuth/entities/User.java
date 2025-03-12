@@ -43,6 +43,24 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Set<Role> roles = new HashSet<>();
 
+    // Password authentication fields
+    @Column(length = 60)
+    private String password;
+
+    @Column(length = 64)
+    private String verificationToken;
+
+    private boolean enabled = false;
+
+    @Column
+    private Instant verificationTokenExpiry;
+
+    @Column(length = 64)
+    private String passwordResetToken;
+
+    @Column
+    private Instant passwordResetTokenExpiry;
+
     // OAuth provider IDs
     @Column(unique = true)
     private String googleId;

@@ -2,14 +2,13 @@ package com.template.OAuth.controller;
 
 import com.template.OAuth.annotation.Auditable;
 import com.template.OAuth.config.JwtTokenProvider;
-import com.template.OAuth.dto.AuthResponse;
-import com.template.OAuth.dto.UserLoginRequest;
+import com.template.OAuth.dto.*;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.enums.AuditEventType;
-import com.template.OAuth.enums.AuthProvider;
 import com.template.OAuth.repositories.RefreshTokenRepository;
 import com.template.OAuth.repositories.UserRepository;
 import com.template.OAuth.service.AuditService;
+import com.template.OAuth.service.AuthService;
 import com.template.OAuth.service.MessageService;
 import com.template.OAuth.service.MetricsService;
 import io.micrometer.core.annotation.Timed;
@@ -24,6 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,6 +44,7 @@ public class AuthController {
     private final AuditService auditService;
     private final MetricsService metricsService;
     private final MessageService messageService;
+    private final AuthService authService;
 
     @Autowired
     public AuthController(JwtTokenProvider jwtTokenProvider,
@@ -51,13 +52,184 @@ public class AuthController {
                           RefreshTokenRepository refreshTokenRepository,
                           AuditService auditService,
                           MetricsService metricsService,
-                          MessageService messageService) {
+                          MessageService messageService,
+                          AuthService authService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.auditService = auditService;
         this.metricsService = metricsService;
         this.messageService = messageService;
+        this.authService = authService;
+    }
+
+    @Operation(summary = "Register a new user with email and password",
+            description = "Registers a new user account that requires email verification")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Registration successful"),
+            @ApiResponse(responseCode = "400", description = "Invalid input data or email already in use",
+                    content = @Content)
+    })
+    @SecurityRequirements // No security requirements for registration endpoint
+    @PostMapping("/register")
+    @Timed(value = "auth.register.time", description = "Time taken to register new user")
+    public ResponseEntity<Map<String, String>> registerUser(
+            @Parameter(description = "User registration details", required = true)
+            @Valid @RequestBody EmailRegistrationRequest registrationRequest) {
+
+        try {
+            User user = authService.registerUser(registrationRequest);
+
+            // Record metrics for new user registration
+            metricsService.incrementRegistration();
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", messageService.getMessage("user.created"));
+            response.put("email", user.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @Operation(summary = "Verify email address",
+            description = "Verifies a user's email address using the token sent in the verification email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Email verified successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token",
+                    content = @Content)
+    })
+    @SecurityRequirements // No security requirements for verification endpoint
+    @GetMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(
+            @Parameter(description = "Verification token", required = true)
+            @RequestParam String token) {
+
+        try {
+            boolean verified = authService.verifyEmail(token);
+
+            Map<String, String> response = new HashMap<>();
+            if (verified) {
+                response.put("message", messageService.getMessage("email.verified"));
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("message", messageService.getMessage("email.verification.failed"));
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @Operation(summary = "Resend verification email",
+            description = "Resends the verification email for unverified accounts")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Verification email sent successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid email or account already verified",
+                    content = @Content)
+    })
+    @SecurityRequirements // No security requirements for resend verification
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerificationEmail(
+            @Parameter(description = "Email address", required = true)
+            @RequestParam String email) {
+
+        try {
+            authService.resendVerificationEmail(email);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", messageService.getMessage("email.verification.resent"));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @Operation(summary = "Initiate password reset",
+            description = "Sends a password reset email to the specified email address")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset email sent successfully")
+    })
+    @SecurityRequirements // No security requirements for password reset
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @Parameter(description = "Password reset request", required = true)
+            @Valid @RequestBody PasswordResetRequest resetRequest) {
+
+        authService.initiatePasswordReset(resetRequest.getEmail());
+
+        // Always return success, even if email doesn't exist (security measure)
+        Map<String, String> response = new HashMap<>();
+        response.put("message", messageService.getMessage("email.password.reset.sent"));
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Reset password",
+            description = "Resets the user's password using the token sent in the reset email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token",
+                    content = @Content)
+    })
+    @SecurityRequirements // No security requirements for password reset
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @Parameter(description = "Password reset completion data", required = true)
+            @Valid @RequestBody PasswordResetCompletion resetCompletion) {
+
+        try {
+            boolean reset = authService.resetPassword(resetCompletion.getToken(), resetCompletion.getPassword());
+
+            Map<String, String> response = new HashMap<>();
+            if (reset) {
+                response.put("message", messageService.getMessage("password.reset.success"));
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("message", messageService.getMessage("password.reset.failed"));
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @Operation(summary = "Login with email and password",
+            description = "Authenticates a user with email and password credentials")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Authentication successful",
+                    content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid credentials or unverified account",
+                    content = @Content)
+    })
+    @SecurityRequirements // No security requirements for login endpoint
+    @PostMapping("/email-login")
+    @Timed(value = "auth.email.login.time", description = "Time taken to perform email login")
+    public ResponseEntity<AuthResponse> loginWithEmail(
+            @Parameter(description = "User login details", required = true)
+            @Valid @RequestBody EmailLoginRequest loginRequest,
+            HttpServletResponse response) {
+
+        try {
+            authService.authenticateAndGenerateTokens(loginRequest, response);
+
+            // Record metrics for successful login
+            metricsService.incrementAuthSuccess();
+
+            return ResponseEntity.ok(new AuthResponse(null, messageService.getMessage("auth.login.success")));
+        } catch (Exception e) {
+            // Record metrics for failed login
+            metricsService.incrementAuthFailure();
+
+            return ResponseEntity.badRequest().body(new AuthResponse(null, e.getMessage()));
+        }
     }
 
     @Operation(summary = "Authenticate user",
@@ -88,7 +260,8 @@ public class AuthController {
             user.setEmail(loginRequest.getEmail());
             user.setName(loginRequest.getName());
             user.setPicture(loginRequest.getPicture());
-            user.setPrimaryProvider(AuthProvider.GOOGLE);
+            user.setPrimaryProvider(com.template.OAuth.enums.AuthProvider.GOOGLE);
+            user.setEnabled(true); // OAuth users are automatically verified
             isNewUser = true;
             userRepository.save(user);
 
