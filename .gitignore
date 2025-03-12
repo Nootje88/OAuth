@@ -1,1 +1,5 @@
 /target/
+.env.dev
+.env.pat
+.env.prod
+.env.test

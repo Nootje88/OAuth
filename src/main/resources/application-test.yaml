@@ -35,3 +35,7 @@ spring:
           google:
             client-id: test-client-id
             client-secret: test-client-secret
+
+# Test-specific properties (for testing only)
+jwt:
+  secret: test-secret-key-for-unit-testing

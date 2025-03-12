@@ -28,6 +28,7 @@ public class JwtTokenProvider {
         this.appProperties = appProperties;
     }
 
+
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }

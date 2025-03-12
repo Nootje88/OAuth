@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: .docker/pat/Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=pat
+      - JAVA_OPTS=-Xms512m -Xmx1g
+    ports:
+      - "8081:8080"
+    volumes:
+      - pat_uploads:/app/data/uploads
+      - pat_logs:/var/log/oauth-app
+    networks:
+      - pat-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/management/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    environment:
+      - MYSQL_ROOT_PASSWORD=${PAT_DB_PASSWORD}
+      - MYSQL_DATABASE=oauth_pat
+    volumes:
+      - pat_mysql_data:/var/lib/mysql
+    networks:
+      - pat-network
+
+volumes:
+  pat_uploads:
+  pat_logs:
+  pat_mysql_data:
+
+networks:
+  pat-network:
+    driver: bridge

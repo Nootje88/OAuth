@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: .docker/${SPRING_PROFILES_ACTIVE}/Dockerfile
+    environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_URL=${DB_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - APPLE_CLIENT_ID=${APPLE_CLIENT_ID}
+      - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET}
+      - SOUNDCLOUD_CLIENT_ID=${SOUNDCLOUD_CLIENT_ID}
+      - SOUNDCLOUD_CLIENT_SECRET=${SOUNDCLOUD_CLIENT_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USERNAME=${EMAIL_USERNAME}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - EMAIL_DEBUG=${EMAIL_DEBUG}
+      - APP_BASE_URL=${APP_BASE_URL}
+      - SUPPORT_EMAIL=${SUPPORT_EMAIL}
+      - APP_NAME=${APP_NAME}
+    ports:
+      - "${SERVER_PORT}:8080"
+    volumes:
+      - uploads:/app/data/uploads
+      - logs:/var/log/oauth-app
+    networks:
+      - oauth-network
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=oauth_db
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./.docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - oauth-network
+
+networks:
+  oauth-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  logs:
+  mysql_data:
