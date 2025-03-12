@@ -1,7 +1,8 @@
 package com.template.OAuth.enums;
 
 public enum AuthProvider {
-    GOOGLE, LOCAL,
+    GOOGLE,
+    LOCAL,
     SPOTIFY,
     APPLE,
     SOUNDCLOUD

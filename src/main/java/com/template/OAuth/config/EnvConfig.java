@@ -6,11 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 
 import java.io.File;
 
 @Configuration
+@Profile("!test")
 public class EnvConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(EnvConfig.class);
@@ -22,7 +24,7 @@ public class EnvConfig {
     public void loadEnv() {
         // Determine which environment file to load based on active profile
         String activeProfile = getActiveProfile();
-        String envFile = determineEnvFile(activeProfile);
+        String envFile = ".env." + activeProfile;
 
         logger.info("Loading environment variables from: {}", envFile);
 

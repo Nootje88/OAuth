@@ -1,0 +1,35 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Environment files
+.env*
+!.env.template
+
+# Build files
+target/
+build/
+*.jar
+*.war
+
+# Logs
+logs/
+*.log
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Documentation
+*.md
+HELP.md
+LICENSE
+
+# Test files
+**/test/
+
+# OS files
+.DS_Store
+Thumbs.db
