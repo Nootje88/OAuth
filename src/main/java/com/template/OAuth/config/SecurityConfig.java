@@ -11,7 +11,6 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -68,6 +67,7 @@ public class SecurityConfig {
                 "/auth/resend-verification",
                 "/auth/forgot-password",
                 "/auth/reset-password",
+                "/auth/login-url",
                 "/refresh-token",
                 "/oauth2/**",
                 "/login/oauth2/**",
@@ -122,6 +122,9 @@ public class SecurityConfig {
 
                         // Premium user endpoints
                         .requestMatchers("/api/premium/**").hasAnyRole("ADMIN", "PREMIUM")
+
+                        // User endpoints
+                        .requestMatchers("/api/user/**").authenticated()
 
                         // Management endpoints (except health and info)
                         .requestMatchers("/management/**").hasRole("ADMIN")

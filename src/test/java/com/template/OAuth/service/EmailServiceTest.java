@@ -39,6 +39,15 @@ class EmailServiceTest {
     private AppProperties.Application application;
 
     @Mock
+    private AppProperties.Security security;
+
+    @Mock
+    private AppProperties.Security.Verification verification;
+
+    @Mock
+    private AppProperties.Security.PasswordReset passwordReset;
+
+    @Mock
     private MessageService messageService;
 
     @InjectMocks
@@ -51,12 +60,18 @@ class EmailServiceTest {
         // Setup mocks
         when(appProperties.getEmail()).thenReturn(email);
         when(appProperties.getApplication()).thenReturn(application);
+        when(appProperties.getSecurity()).thenReturn(security);
+        when(security.getVerification()).thenReturn(verification);
+        when(security.getPasswordReset()).thenReturn(passwordReset);
 
         when(email.getFromAddress()).thenReturn("noreply@example.com");
         when(email.getFromName()).thenReturn("Test App");
 
         when(application.getBaseUrl()).thenReturn("http://localhost:3000");
         when(application.getSupportEmail()).thenReturn("support@example.com");
+
+        when(verification.getExpirationHours()).thenReturn(24);
+        when(passwordReset.getExpirationHours()).thenReturn(1);
 
         when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
         when(templateEngine.process(anyString(), any(IContext.class))).thenReturn("<html><body>Test Email Content</body></html>");
@@ -108,5 +123,10 @@ class EmailServiceTest {
         // Assert
         verify(mailSender, times(1)).send(any(MimeMessage.class));
         verify(templateEngine, times(1)).process(eq("welcome-email"), any(IContext.class));
+    }
+
+    // Helper to use eq() with static imports
+    private static <T> T eq(T value) {
+        return org.mockito.ArgumentMatchers.eq(value);
     }
 }

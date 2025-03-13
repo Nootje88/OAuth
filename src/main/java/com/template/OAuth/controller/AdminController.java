@@ -26,7 +26,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api")
+// Change from "/api" to "/api/admin" for admin-specific endpoints
+@RequestMapping("/api/admin")
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 @Tag(name = "Admin", description = "Admin management endpoints")
 @SecurityRequirement(name = "cookie") // Require authentication for all admin endpoints
@@ -53,7 +54,7 @@ public class AdminController {
                     content = @Content)
     })
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/admin/assign-role")
+    @PostMapping("/assign-role")
     @Auditable(type = AuditEventType.USER_ROLE_CHANGED, description = "Admin assigned role to user", includeArgs = true)
     public ResponseEntity<Map<String, String>> assignRole(
             @Parameter(description = "User email", required = true)
@@ -83,7 +84,7 @@ public class AdminController {
                     content = @Content)
     })
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/admin/remove-role")
+    @PostMapping("/remove-role")
     @Auditable(type = AuditEventType.USER_ROLE_CHANGED, description = "Admin removed role from user", includeArgs = true)
     public ResponseEntity<Map<String, String>> removeRole(
             @Parameter(description = "User email", required = true)
@@ -111,7 +112,7 @@ public class AdminController {
                     content = @Content)
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @GetMapping("/moderator/users")
+    @GetMapping("/users")
     public ResponseEntity<List<UserDto>> getAllUsers() {
         List<User> users = userService.findAllUsers();
         List<UserDto> userDtos = users.stream()
@@ -145,7 +146,7 @@ public class AdminController {
             @ApiResponse(responseCode = "401", description = "Unauthorized - Not authenticated",
                     content = @Content)
     })
-    @GetMapping("/user/profile")
+    @GetMapping("/profile")
     public ResponseEntity<UserDto> getUserProfile() {
         User currentUser = userService.getCurrentUser();
         return ResponseEntity.ok(convertToDto(currentUser));

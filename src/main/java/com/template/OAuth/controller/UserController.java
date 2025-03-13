@@ -1,12 +1,13 @@
 package com.template.OAuth.controller;
 
 import com.template.OAuth.dto.UserDto;
+import com.template.OAuth.entities.User;
 import com.template.OAuth.mapper.UserMapper;
 import com.template.OAuth.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/user")
 public class UserController {
 
     private final UserService userService;
@@ -17,8 +18,14 @@ public class UserController {
         this.userMapper = userMapper;
     }
 
+    @GetMapping("/profile")
+    public UserDto getUser() {
+        User currentUser = userService.getCurrentUser();
+        return userMapper.toDto(currentUser);
+    }
+
     @GetMapping("/{email}")
-    public UserDto getUser(@PathVariable String email) {
+    public UserDto getUserByEmail(@PathVariable String email) {
         return userMapper.toDto(userService.findUserByEmail(email));
     }
 }

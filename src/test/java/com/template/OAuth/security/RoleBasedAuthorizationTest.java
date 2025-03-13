@@ -14,19 +14,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class RoleBasedAuthorizationTest {
+public class RoleBasedAuthorizationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,7 +65,9 @@ class RoleBasedAuthorizationTest {
         // Add the role
         HashSet<Role> roles = new HashSet<>();
         roles.add(Role.USER); // Base role
-        roles.add(role);      // Specific role
+        if (role != Role.USER) {
+            roles.add(role);  // Specific role
+        }
         user.setRoles(roles);
 
         return userRepository.save(user);
@@ -75,78 +77,108 @@ class RoleBasedAuthorizationTest {
     @WithMockUser(roles = "USER")
     void testUserAccess() throws Exception {
         // Users can access their profile
-        mockMvc.perform(get("/api/user/profile"))
+        mockMvc.perform(get("/api/user/profile")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Users cannot access admin endpoints
-        mockMvc.perform(get("/api/admin/users"))
+        mockMvc.perform(get("/api/admin/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden());
 
         // Users cannot access moderator endpoints
-        mockMvc.perform(get("/api/moderator/users"))
+        mockMvc.perform(get("/api/moderator/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden());
 
         // Users cannot access premium content
-        mockMvc.perform(get("/api/premium/content"))
+        mockMvc.perform(get("/api/premium/content")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(username = "admin@example.com", roles = {"USER", "ADMIN"})
     void testAdminAccess() throws Exception {
         // Admins can access user endpoints
-        mockMvc.perform(get("/api/user/profile"))
+        mockMvc.perform(get("/api/user/profile")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Admins can access admin endpoints
-        mockMvc.perform(get("/api/admin/users"))
+        mockMvc.perform(get("/api/admin/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Admins can access moderator endpoints
-        mockMvc.perform(get("/api/moderator/users"))
+        mockMvc.perform(get("/api/moderator/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
     }
 
     @Test
-    @WithMockUser(roles = "MODERATOR")
+    @WithMockUser(username = "moderator@example.com", roles = {"USER", "MODERATOR"})
     void testModeratorAccess() throws Exception {
         // Moderators can access user endpoints
-        mockMvc.perform(get("/api/user/profile"))
+        mockMvc.perform(get("/api/user/profile")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Moderators can access moderator endpoints
-        mockMvc.perform(get("/api/moderator/users"))
+        mockMvc.perform(get("/api/moderator/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Moderators cannot access admin endpoints
-        mockMvc.perform(get("/api/admin/users"))
+        mockMvc.perform(get("/api/admin/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(roles = "PREMIUM")
+    @WithMockUser(username = "premium@example.com", roles = {"USER", "PREMIUM"})
     void testPremiumAccess() throws Exception {
         // Premium users can access user endpoints
-        mockMvc.perform(get("/api/user/profile"))
+        mockMvc.perform(get("/api/user/profile")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Premium users can access premium content
-        mockMvc.perform(get("/api/premium/content"))
+        mockMvc.perform(get("/api/premium/content")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
 
         // Premium users cannot access admin endpoints
-        mockMvc.perform(get("/api/admin/users"))
+        mockMvc.perform(get("/api/admin/users")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void testUnauthenticatedAccess() throws Exception {
         // Unauthenticated users cannot access protected endpoints
-        mockMvc.perform(get("/api/user/profile"))
+        mockMvc.perform(get("/api/user/profile")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isUnauthorized());
 
         // Unauthenticated users can access public endpoints
-        mockMvc.perform(get("/auth/login-url"))
+        mockMvc.perform(get("/auth/login-url")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
     }
 }

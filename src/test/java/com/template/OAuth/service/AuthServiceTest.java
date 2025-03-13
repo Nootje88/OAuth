@@ -4,8 +4,10 @@ import com.template.OAuth.config.AppProperties;
 import com.template.OAuth.config.JwtTokenProvider;
 import com.template.OAuth.dto.EmailLoginRequest;
 import com.template.OAuth.dto.EmailRegistrationRequest;
+import com.template.OAuth.entities.RefreshToken;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.repositories.UserRepository;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,8 +54,18 @@ class AuthServiceTest {
     @Mock
     private AppProperties appProperties;
 
+    // Mock the nested objects in AppProperties
     @Mock
     private AppProperties.Security security;
+
+    @Mock
+    private AppProperties.Security.Jwt jwt;
+
+    @Mock
+    private AppProperties.Security.Refresh refresh;
+
+    @Mock
+    private AppProperties.Security.Cookie cookie;
 
     @Mock
     private AppProperties.Security.Verification verification;
@@ -69,6 +81,7 @@ class AuthServiceTest {
 
     private User testUser;
     private EmailRegistrationRequest registrationRequest;
+    private RefreshToken testRefreshToken;
 
     @BeforeEach
     void setUp() {
@@ -87,10 +100,26 @@ class AuthServiceTest {
         registrationRequest.setName("Test User");
         registrationRequest.setPassword("Password123!");
 
-        // Mock AppProperties
+        // Set up test refresh token
+        testRefreshToken = new RefreshToken();
+        testRefreshToken.setId(1L);
+        testRefreshToken.setUser(testUser);
+        testRefreshToken.setToken("test-refresh-token");
+        testRefreshToken.setExpiryDate(Instant.now().plusSeconds(3600));
+
+        // Mock AppProperties nested structure
         when(appProperties.getSecurity()).thenReturn(security);
         when(security.getVerification()).thenReturn(verification);
+        when(security.getJwt()).thenReturn(jwt);
+        when(security.getRefresh()).thenReturn(refresh);
+        when(security.getCookie()).thenReturn(cookie);
+
+        // Set values for the nested properties
         when(verification.getExpirationHours()).thenReturn(24);
+        when(jwt.getExpiration()).thenReturn(3600000L); // 1 hour in milliseconds
+        when(refresh.getExpiration()).thenReturn(86400000L); // 1 day in milliseconds
+        when(cookie.isSecure()).thenReturn(false);
+        when(cookie.getSameSite()).thenReturn("Lax");
     }
 
     @Test
@@ -189,6 +218,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
         when(userRepository.save(any(User.class))).thenReturn(testUser);
         when(jwtTokenProvider.generateToken(anyString())).thenReturn("jwt-token");
+        when(refreshTokenService.generateRefreshToken(any(User.class))).thenReturn(testRefreshToken);
 
         // Act
         authService.authenticateAndGenerateTokens(loginRequest, servletResponse);
@@ -197,6 +227,9 @@ class AuthServiceTest {
         verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
         verify(jwtTokenProvider, times(1)).generateToken(anyString());
         verify(refreshTokenService, times(1)).generateRefreshToken(any(User.class));
-        verify(servletResponse, times(2)).addCookie(any());
+        verify(servletResponse, times(2)).addCookie(any(Cookie.class));
+
+        // Verify the user activity was recorded
+        verify(userRepository, times(1)).save(any(User.class));
     }
 }
