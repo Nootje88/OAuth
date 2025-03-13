@@ -141,7 +141,7 @@ public class EnvConfig {
         logger.info("JWTs will expire after {} ms", springEnv.getProperty("app.security.jwt.expiration"));
 
         // Check for required configuration
-        checkRequiredConfig("jwt.secret", "JWT secret key is missing");
+        checkRequiredConfig("app.security.jwt.secret", "JWT secret key is missing");
         checkRequiredConfig("spring.datasource.url", "Database URL is missing");
         checkRequiredConfig("spring.datasource.username", "Database username is missing");
     }

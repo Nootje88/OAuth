@@ -10,6 +10,7 @@ import com.template.OAuth.service.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -21,6 +22,12 @@ import java.util.Locale;
 
 @Component
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
+
+    @Value("${app.application.baseUrl:http://localhost:3000}")
+    private String frontendUrl;
+
+    @Value("${LOGIN_SUCCESS_REDIRECT_URL:/home}")
+    private String loginSuccessRedirectUrl;
 
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
@@ -44,7 +51,24 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         this.auditService = auditService;
         this.messageService = messageService;
         this.localeResolver = localeResolver;
-        setDefaultTargetUrl("http://localhost:3000/home");
+
+        // Properly format the default target URL
+        // If frontendUrl already contains http/https and loginSuccessRedirectUrl starts with /,
+        // we need to ensure we don't end up with double slashes
+        String targetUrl;
+        if (frontendUrl.endsWith("/") && loginSuccessRedirectUrl.startsWith("/")) {
+            // Remove trailing slash from frontendUrl to prevent double slash
+            targetUrl = frontendUrl.substring(0, frontendUrl.length() - 1) + loginSuccessRedirectUrl;
+        } else if (!frontendUrl.endsWith("/") && !loginSuccessRedirectUrl.startsWith("/")) {
+            // Add slash between parts
+            targetUrl = frontendUrl + "/" + loginSuccessRedirectUrl;
+        } else {
+            // They're already compatible (one has slash, the other doesn't)
+            targetUrl = frontendUrl + loginSuccessRedirectUrl;
+        }
+
+        // Set the default target URL - this must start with http(s) or /
+        setDefaultTargetUrl(targetUrl);
     }
 
     @Override
@@ -107,7 +131,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                         messageService.getMessage("auth.login.failure"),
                         "Error: " + e.getMessage());
 
-                response.sendRedirect("http://localhost:3000/login?error=auth");
+                // Format the error redirect URL
+                String errorRedirectUrl;
+                if (frontendUrl.endsWith("/")) {
+                    errorRedirectUrl = frontendUrl + "login?error=auth";
+                } else {
+                    errorRedirectUrl = frontendUrl + "/login?error=auth";
+                }
+
+                response.sendRedirect(errorRedirectUrl);
             }
         } else {
             logger.error("Authentication principal is not OidcUser");
@@ -117,7 +149,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                     messageService.getMessage("auth.login.failure"),
                     "Error: Authentication principal is not OidcUser");
 
-            response.sendRedirect("http://localhost:3000/login?error=type");
+            // Format the error redirect URL
+            String errorRedirectUrl;
+            if (frontendUrl.endsWith("/")) {
+                errorRedirectUrl = frontendUrl + "login?error=type";
+            } else {
+                errorRedirectUrl = frontendUrl + "/login?error=type";
+            }
+
+            response.sendRedirect(errorRedirectUrl);
         }
     }
 }

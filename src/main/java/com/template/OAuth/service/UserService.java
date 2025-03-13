@@ -6,6 +6,7 @@ import com.template.OAuth.enums.NotificationType;
 import com.template.OAuth.enums.Role;
 import com.template.OAuth.repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
@@ -25,6 +26,9 @@ public class UserService {
 
     @Autowired
     private Environment springEnv;
+
+    @Value("${ADMIN_EMAILS:admin@yourdomain.com,diasnino@gmail.com}")
+    private String adminEmails;
 
     /**
      * Save or update a user from OAuth2 authentication
@@ -64,7 +68,8 @@ public class UserService {
             user.addRole(Role.USER);
 
             // Optionally assign ADMIN role to specific users
-            if ("admin@yourdomain.com".equals(email) || "diasnino@gmail.com".equals(email)) {
+            List<String> adminEmailList = Arrays.asList(adminEmails.split(","));
+            if (adminEmailList.contains(email)) {
                 user.addRole(Role.ADMIN);
             }
 
@@ -104,6 +109,12 @@ public class UserService {
 
         // Assign default USER role
         user.addRole(Role.USER);
+
+        // Check if user should be an admin
+        List<String> adminEmailList = Arrays.asList(adminEmails.split(","));
+        if (adminEmailList.contains(email)) {
+            user.addRole(Role.ADMIN);
+        }
 
         // Initialize default notification preferences
         user.enableNotification(NotificationType.EMAIL_SECURITY);
