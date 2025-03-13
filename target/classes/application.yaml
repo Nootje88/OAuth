@@ -1,17 +1,19 @@
 # Common configuration shared across all profiles
 spring:
-  config:
-    import:
-      - optional:file:.env[.properties]
-      - optional:file:.env.${spring.profiles.active}[.properties]
   profiles:
     active: dev  # Default profile is development
   datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/OAuthTemplate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+    show-sql: true
+    hibernate:
+      ddl-auto: update
   servlet:
     multipart:
       max-file-size: 5MB
@@ -21,8 +23,8 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
+            client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dummy-client-secret}
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - openid
@@ -41,27 +43,15 @@ spring:
       # Number of failed attempts before blocking IP
       max-failed-attempts: 5
 
-#          spotify:
-#            client-id: ${SPOTIFY_CLIENT_ID}
-#            client-secret: ${SPOTIFY_CLIENT_SECRET}
-#
-#          apple:
-#            client-id: ${APPLE_CLIENT_ID}
-#            client-secret: ${APPLE_CLIENT_SECRET}
-#
-#          soundcloud:
-#            client-id: ${SOUNDCLOUD_CLIENT_ID}
-#            client-secret: ${SOUNDCLOUD_CLIENT_SECRET}
-
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
 
 # Common application settings
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET}
+      secret: ${JWT_SECRET:defaultsecretkey12345678901234567890}
       expiration: 3600000         # JWT token expiration time in milliseconds (1 hour)
     refresh:
       expiration: 604800000       # Refresh token expiration time (7 days)
@@ -75,12 +65,12 @@ app:
   profile:
     max-bio-length: 500           # Maximum biography length in characters
     default-theme: SYSTEM         # Default theme preference
-    upload-dir: uploads/profiles  # Profile picture upload directory
+    upload-dir: ${UPLOAD_DIR:uploads/profiles}  # Profile picture upload directory
   email:
     host: ${EMAIL_HOST:smtp.gmail.com}
     port: ${EMAIL_PORT:587}
-    username: ${EMAIL_USERNAME}
-    password: ${EMAIL_PASSWORD}
+    username: ${EMAIL_USERNAME:email@example.com}
+    password: ${EMAIL_PASSWORD:password}
     fromAddress: ${EMAIL_FROM_ADDRESS:no-reply@example.com}
     fromName: ${EMAIL_FROM_NAME:OAuth Template App}
     debug: ${EMAIL_DEBUG:false}
@@ -90,10 +80,10 @@ app:
     name: ${APP_NAME:OAuth Template}
   cors:
     allowedOrigins:
-      - http://localhost:3000
-  frontend-url: ${FRONTEND_URL}
-  login-success-redirect-url: ${LOGIN_SUCCESS_REDIRECT_URL}
-  admin-emails: ${ADMIN_EMAILS}
+      - ${FRONTEND_URL:http://localhost:3000}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  login-success-redirect-url: ${LOGIN_SUCCESS_REDIRECT_URL:/home}
+  admin-emails: ${ADMIN_EMAILS:admin@example.com}
 
 # Springdoc configuration
 springdoc:
@@ -156,7 +146,7 @@ management:
 # Custom application info
 info:
   application:
-    name: OAuth Template
+    name: ${APP_NAME:OAuth Template}
     description: OAuth 2.0 Authentication Service
     version: 0.0.1-SNAPSHOT
     environment: ${spring.profiles.active:dev}
