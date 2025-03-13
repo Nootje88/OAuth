@@ -57,7 +57,7 @@ A comprehensive Spring Boot template for implementing OAuth 2.0 authentication w
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/oauth-template.git
+   git clone https://github.com/Nootje88/oauth.git
    cd oauth-template
    ```
 
