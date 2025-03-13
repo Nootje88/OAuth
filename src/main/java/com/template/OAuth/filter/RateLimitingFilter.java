@@ -1,13 +1,17 @@
 package com.template.OAuth.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.template.OAuth.enums.AuditEventType;
 import com.template.OAuth.service.AuditService;
+import com.template.OAuth.service.MetricsService;
 import com.template.OAuth.service.RateLimitService;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -24,8 +28,11 @@ import java.util.regex.Pattern;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RateLimitingFilter extends OncePerRequestFilter {
 
+    private static final Logger logger = LoggerFactory.getLogger(RateLimitingFilter.class);
+
     private final RateLimitService rateLimitService;
     private final AuditService auditService;
+    private final MetricsService metricsService;
     private final ObjectMapper objectMapper;
 
     // Pattern for authentication endpoints
@@ -34,10 +41,25 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     // Pattern for sensitive operations (admin, password changes, etc.)
     private static final Pattern SENSITIVE_ENDPOINTS = Pattern.compile("^/(api/admin|api/moderator|api/user/password)/.*$");
 
-    public RateLimitingFilter(RateLimitService rateLimitService, AuditService auditService, ObjectMapper objectMapper) {
+    // Pattern for static resources to skip rate limiting
+    private static final Pattern STATIC_RESOURCES = Pattern.compile("^/(swagger-ui|v3/api-docs|favicon.ico|error|css|js|images)/.*$");
+
+    public RateLimitingFilter(
+            RateLimitService rateLimitService,
+            AuditService auditService,
+            MetricsService metricsService,
+            ObjectMapper objectMapper) {
         this.rateLimitService = rateLimitService;
         this.auditService = auditService;
+        this.metricsService = metricsService;
         this.objectMapper = objectMapper;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        // Skip rate limiting for static resources and main page
+        return STATIC_RESOURCES.matcher(path).matches() || path.equals("/");
     }
 
     @Override
@@ -45,45 +67,41 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
+        String method = request.getMethod();
         String clientIp = getClientIP(request);
+        String requestId = generateRequestId();
 
-        // Skip rate limiting for non-API requests
-        if (shouldSkipRateLimiting(path)) {
-            filterChain.doFilter(request, response);
-            return;
+        // Add request ID to response headers for tracking
+        response.setHeader("X-Request-ID", requestId);
+
+        // Log request information with low verbosity for normal requests
+        if (logger.isDebugEnabled()) {
+            logger.debug("Request received - ID: {}, Method: {}, Path: {}, IP: {}",
+                    requestId, method, path, clientIp);
         }
 
         Bucket bucket;
         long remainingTokens;
+        String bucketType = "standard";
 
         // Apply different rate limits based on endpoint type
         if (AUTH_ENDPOINTS.matcher(path).matches()) {
             bucket = rateLimitService.resolveBucketForAuthRequest(clientIp);
             remainingTokens = rateLimitService.checkRateLimit(bucket, 1);
+            bucketType = "auth";
 
             if (remainingTokens < 0) {
-                auditService.logEvent(com.template.OAuth.enums.AuditEventType.ACCESS_DENIED,
-                        "Rate limit exceeded for authentication endpoint",
-                        "IP: " + clientIp + ", Path: " + path,
-                        "RATE_LIMITED");
-
-                rejectRequest(response, "Too many authentication attempts",
-                        "Please try again later", HttpStatus.TOO_MANY_REQUESTS);
+                handleRateLimitExceeded(response, requestId, clientIp, path, bucketType);
                 return;
             }
         }
         else if (SENSITIVE_ENDPOINTS.matcher(path).matches()) {
             bucket = rateLimitService.resolveBucketForSensitiveOperation(clientIp);
             remainingTokens = rateLimitService.checkRateLimit(bucket, 1);
+            bucketType = "sensitive";
 
             if (remainingTokens < 0) {
-                auditService.logEvent(com.template.OAuth.enums.AuditEventType.ACCESS_DENIED,
-                        "Rate limit exceeded for sensitive operation",
-                        "IP: " + clientIp + ", Path: " + path,
-                        "RATE_LIMITED");
-
-                rejectRequest(response, "Rate limit exceeded for sensitive operations",
-                        "Please try again later", HttpStatus.TOO_MANY_REQUESTS);
+                handleRateLimitExceeded(response, requestId, clientIp, path, bucketType);
                 return;
             }
         }
@@ -91,27 +109,77 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             // Default API rate limiting
             bucket = rateLimitService.resolveBucketForEndpoint(path);
             remainingTokens = rateLimitService.checkRateLimit(bucket, 1);
+            bucketType = "standard";
 
             if (remainingTokens < 0) {
-                rejectRequest(response, "API rate limit exceeded",
-                        "Please try again later", HttpStatus.TOO_MANY_REQUESTS);
+                handleRateLimitExceeded(response, requestId, clientIp, path, bucketType);
                 return;
             }
         }
 
         // Add rate limit headers
         response.addHeader("X-Rate-Limit-Remaining", String.valueOf(remainingTokens));
+        response.addHeader("X-Rate-Limit-Type", bucketType);
 
+        // Log remaining tokens for debugging
+        if (logger.isDebugEnabled() && remainingTokens < 10) {
+            logger.debug("Rate limit nearly reached - ID: {}, IP: {}, Path: {}, Bucket: {}, Remaining: {}",
+                    requestId, clientIp, path, bucketType, remainingTokens);
+        }
+
+        // Update metrics
+        metricsService.incrementCustomCounter("rate.limit.request",
+                "bucket", bucketType,
+                "path", path,
+                "method", method);
+
+        // Continue with the request
         filterChain.doFilter(request, response);
     }
 
-    private boolean shouldSkipRateLimiting(String path) {
-        // Skip static resources, Swagger UI, error pages
-        return path.startsWith("/swagger-ui") ||
-                path.startsWith("/v3/api-docs") ||
-                path.startsWith("/favicon.ico") ||
-                path.startsWith("/error") ||
-                path.equals("/");
+    private void handleRateLimitExceeded(
+            HttpServletResponse response,
+            String requestId,
+            String clientIp,
+            String path,
+            String bucketType) throws IOException {
+
+        // Log rate limit exceeded with high severity
+        logger.warn("Rate limit exceeded - ID: {}, IP: {}, Path: {}, Bucket: {}",
+                requestId, clientIp, path, bucketType);
+
+        // Record audit event
+        auditService.logEvent(AuditEventType.ACCESS_DENIED,
+                "Rate limit exceeded",
+                String.format("Request ID: %s, IP: %s, Path: %s, Type: %s", requestId, clientIp, path, bucketType),
+                "RATE_LIMITED");
+
+        // Update metrics
+        metricsService.incrementCustomCounter("rate.limit.exceeded",
+                "bucket", bucketType,
+                "path", path);
+        metricsService.incrementError("rate_limit");
+
+        // Determine appropriate error message
+        String message, details;
+
+        switch (bucketType) {
+            case "auth":
+                message = "Too many authentication attempts";
+                details = "Please try again later. Authentication endpoints have stricter rate limits.";
+                break;
+            case "sensitive":
+                message = "Rate limit exceeded for sensitive operations";
+                details = "Please try again later. Administrative operations have stricter rate limits.";
+                break;
+            default:
+                message = "API rate limit exceeded";
+                details = "Please try again later. Consider reducing your request frequency.";
+                break;
+        }
+
+        // Send rate limit response
+        rejectRequest(response, message, details, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     private void rejectRequest(HttpServletResponse response, String message, String details, HttpStatus status)
@@ -123,6 +191,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         errorResponse.put("message", message);
         errorResponse.put("details", details);
         errorResponse.put("status", String.valueOf(status.value()));
+        errorResponse.put("error", "TOO_MANY_REQUESTS");
 
         response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
     }
@@ -132,6 +201,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (xfHeader != null) {
             return xfHeader.split(",")[0].trim();
         }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null) {
+            return realIp;
+        }
         return request.getRemoteAddr();
+    }
+
+    private String generateRequestId() {
+        return java.util.UUID.randomUUID().toString().substring(0, 8);
     }
 }

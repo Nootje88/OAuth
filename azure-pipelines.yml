@@ -1,0 +1,231 @@
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+variables:
+  # Define variables for different environments
+  - name: vmImageName
+    value: 'ubuntu-latest'
+  - name: jdkVersion
+    value: '23'
+  - name: jdkArchitecture
+    value: 'x64'
+  - name: MavenGroupId
+    value: 'com.template'
+  - name: MavenArtifactId
+    value: 'OAuth'
+  - name: MavenPOMFile
+    value: 'pom.xml'
+  - group: 'oauth-global-variables'
+
+stages:
+  - stage: Build
+    displayName: 'Build and Test'
+    pool:
+      vmImage: $(vmImageName)
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Test'
+        steps:
+          - task: JavaToolInstaller@0
+            displayName: 'Install JDK'
+            inputs:
+              versionSpec: $(jdkVersion)
+              jdkArchitectureOption: $(jdkArchitecture)
+              jdkSourceOption: 'PreInstalled'
+
+          - task: Maven@3
+            displayName: 'Maven Build'
+            inputs:
+              mavenPomFile: '$(MavenPOMFile)'
+              goals: 'clean package'
+              options: '-DskipTests'
+              publishJUnitResults: false
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.23'
+              mavenVersionOption: 'Default'
+              mavenOptions: '-Xmx3072m'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+
+          - task: Maven@3
+            displayName: 'Maven Test'
+            inputs:
+              mavenPomFile: '$(MavenPOMFile)'
+              goals: 'test'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              codeCoverageToolOption: 'JaCoCo'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.23'
+              mavenVersionOption: 'Default'
+              mavenOptions: '-Xmx3072m'
+
+          - task: CopyFiles@2
+            displayName: 'Copy Files to artifact staging directory'
+            inputs:
+              SourceFolder: '$(System.DefaultWorkingDirectory)'
+              Contents: |
+                target/*.jar
+                docker/**
+                .env.template
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  - stage: DeployDev
+    displayName: 'Deploy to Development'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    variables:
+      - group: 'oauth-dev-variables'
+    jobs:
+      - deployment: DeployDev
+        displayName: 'Deploy to Dev Environment'
+        environment: 'development'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'drop'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                - task: AzureWebAppContainer@1
+                  displayName: 'Deploy to Azure Web App for Containers - Dev'
+                  inputs:
+                    azureSubscription: '$(AzureSubscription)'
+                    appName: '$(WebAppNameDev)'
+                    resourceGroupName: '$(ResourceGroupNameDev)'
+                    containers: '$(ContainerRegistry)/$(ImageRepository):$(Build.BuildId)-dev'
+                    appSettings: |
+                      -SPRING_PROFILES_ACTIVE dev
+                      -DB_URL $(DbUrlDev)
+                      -DB_USERNAME $(DbUsernameDev) 
+                      -DB_PASSWORD $(DbPasswordDev)
+                      -JWT_SECRET $(JwtSecretDev)
+                      -GOOGLE_CLIENT_ID $(GoogleClientIdDev)
+                      -GOOGLE_CLIENT_SECRET $(GoogleClientSecretDev)
+                      -EMAIL_USERNAME $(EmailUsernameDev)
+                      -EMAIL_PASSWORD $(EmailPasswordDev)
+                      -APP_BASE_URL $(AppBaseUrlDev)
+
+  - stage: DeployPAT
+    displayName: 'Deploy to PAT'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      - group: 'oauth-pat-variables'
+    jobs:
+      - deployment: DeployPAT
+        displayName: 'Deploy to PAT Environment'
+        environment: 'pat'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'drop'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                - task: AzureWebAppContainer@1
+                  displayName: 'Deploy to Azure Web App for Containers - PAT'
+                  inputs:
+                    azureSubscription: '$(AzureSubscription)'
+                    appName: '$(WebAppNamePAT)'
+                    resourceGroupName: '$(ResourceGroupNamePAT)'
+                    containers: '$(ContainerRegistry)/$(ImageRepository):$(Build.BuildId)-pat'
+                    appSettings: |
+                      -SPRING_PROFILES_ACTIVE pat
+                      -DB_URL $(DbUrlPAT)
+                      -DB_USERNAME $(DbUsernamePAT) 
+                      -DB_PASSWORD $(DbPasswordPAT)
+                      -JWT_SECRET $(JwtSecretPAT)
+                      -GOOGLE_CLIENT_ID $(GoogleClientIdPAT)
+                      -GOOGLE_CLIENT_SECRET $(GoogleClientSecretPAT)
+                      -EMAIL_USERNAME $(EmailUsernamePAT)
+                      -EMAIL_PASSWORD $(EmailPasswordPAT)
+                      -APP_BASE_URL $(AppBaseUrlPAT)
+
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: DeployPAT
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      - group: 'oauth-prod-variables'
+    jobs:
+      - deployment: DeployProd
+        displayName: 'Deploy to Production Environment'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'drop'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                - task: AzureCLI@2
+                  displayName: 'Backup Production Database'
+                  inputs:
+                    azureSubscription: '$(AzureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Get current date for backup file
+                      BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+                      
+                      # Export database backup
+                      az mysql server show --resource-group $(ResourceGroupNameProd) --name $(MysqlServerNameProd)
+                      
+                      # Create a backup via Azure Managed MySQL Export
+                      az mysql db export --server-name $(MysqlServerNameProd) \
+                        --resource-group $(ResourceGroupNameProd) \
+                        --name OAuthTemplate_Prod \
+                        --admin-user $(DbUsernameProd) \
+                        --admin-password $(DbPasswordProd) \
+                        --storage-name $(StorageAccountName) \
+                        --storage-key $(StorageAccountKey) \
+                        --storage-container $(StorageContainerName) \
+                        --storage-path "backups/oauth_prod_${BACKUP_DATE}.bacpac"
+                      
+                      echo "Database backup completed: oauth_prod_${BACKUP_DATE}.bacpac"
+
+                - task: AzureWebAppContainer@1
+                  displayName: 'Deploy to Azure Web App for Containers - Production'
+                  inputs:
+                    azureSubscription: '$(AzureSubscription)'
+                    appName: '$(WebAppNameProd)'
+                    resourceGroupName: '$(ResourceGroupNameProd)'
+                    containers: '$(ContainerRegistry)/$(ImageRepository):$(Build.BuildId)-prod'
+                    appSettings: |
+                      -SPRING_PROFILES_ACTIVE prod
+                      -DB_URL $(DbUrlProd)
+                      -DB_USERNAME $(DbUsernameProd) 
+                      -DB_PASSWORD $(DbPasswordProd)
+                      -JWT_SECRET $(JwtSecretProd)
+                      -GOOGLE_CLIENT_ID $(GoogleClientIdProd)
+                      -GOOGLE_CLIENT_SECRET $(GoogleClientSecretProd)
+                      -EMAIL_USERNAME $(EmailUsernameProd)
+                      -EMAIL_PASSWORD $(EmailPasswordProd)
+                      -APP_BASE_URL $(AppBaseUrlProd)

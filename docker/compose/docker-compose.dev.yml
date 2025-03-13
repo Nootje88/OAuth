@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  app:
+    environment:
+      - JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC -Dspring.profiles.active=dev
+    volumes:
+      - ../../src:/app/src:ro  # Mount source code as read-only for easy development
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  db:
+    ports:
+      - "3306:3306"  # Expose MySQL port for development
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=no
+      - MYSQL_ROOT_HOST=%  # Allow connections from any host in dev
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password

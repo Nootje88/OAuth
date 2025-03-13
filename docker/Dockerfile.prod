@@ -1,0 +1,46 @@
+FROM eclipse-temurin:23-jdk-focal as builder
+
+WORKDIR /app
+
+# Copy Maven files
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+
+# Make mvnw executable
+RUN chmod +x mvnw
+
+# Download dependencies
+RUN ./mvnw dependency:go-offline
+
+# Copy source code
+COPY src src
+
+# Build application with production profile
+RUN ./mvnw clean package -DskipTests -Dspring.profiles.active=prod
+
+# Second stage: minimal runtime environment
+FROM eclipse-temurin:23-jre-focal
+
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+
+# Create directories with appropriate permissions
+RUN mkdir -p /app/data/uploads/profiles \
+    && mkdir -p /var/log/oauth-app \
+    && chown -R nobody:nogroup /app/data /var/log/oauth-app
+
+# Install health check dependencies
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Default to port 8080
+EXPOSE 8080
+
+# Switch to non-root user
+USER nobody
+
+# Use a script to allow passing Java options
+COPY --chown=nobody:nogroup docker/scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

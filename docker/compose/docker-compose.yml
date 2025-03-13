@@ -3,20 +3,18 @@ version: '3.8'
 services:
   app:
     build:
-      context: .
-      dockerfile: .docker/${SPRING_PROFILES_ACTIVE}/Dockerfile
+      context: ../..
+      dockerfile: docker/Dockerfile.${SPRING_PROFILES_ACTIVE:-dev}
+      args:
+        - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+    container_name: oauth-app-${SPRING_PROFILES_ACTIVE:-dev}
     environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_URL=${DB_URL}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
-      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
-      - APPLE_CLIENT_ID=${APPLE_CLIENT_ID}
-      - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET}
-      - SOUNDCLOUD_CLIENT_ID=${SOUNDCLOUD_CLIENT_ID}
-      - SOUNDCLOUD_CLIENT_SECRET=${SOUNDCLOUD_CLIENT_SECRET}
       - JWT_SECRET=${JWT_SECRET}
       - EMAIL_HOST=${EMAIL_HOST}
       - EMAIL_PORT=${EMAIL_PORT}
@@ -28,34 +26,49 @@ services:
       - APP_BASE_URL=${APP_BASE_URL}
       - SUPPORT_EMAIL=${SUPPORT_EMAIL}
       - APP_NAME=${APP_NAME}
+      - SERVER_PORT=8080
     ports:
-      - "${SERVER_PORT}:8080"
+      - "${SERVER_PORT:-8080}:8080"
     volumes:
-      - uploads:/app/data/uploads
-      - logs:/var/log/oauth-app
+      - oauth-uploads-${SPRING_PROFILES_ACTIVE:-dev}:/app/data/uploads
+      - oauth-logs-${SPRING_PROFILES_ACTIVE:-dev}:/var/log/oauth-app
     networks:
-      - oauth-network
+      - oauth-network-${SPRING_PROFILES_ACTIVE:-dev}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/management/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   db:
     image: mysql:8.0
+    container_name: oauth-db-${SPRING_PROFILES_ACTIVE:-dev}
+    restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
-      - MYSQL_DATABASE=oauth_db
+      - MYSQL_DATABASE=oauth_${SPRING_PROFILES_ACTIVE:-dev}
       - MYSQL_USER=${DB_USERNAME}
       - MYSQL_PASSWORD=${DB_PASSWORD}
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./.docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - oauth-mysql-data-${SPRING_PROFILES_ACTIVE:-dev}:/var/lib/mysql
+      - ../../docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - oauth-network
+      - oauth-network-${SPRING_PROFILES_ACTIVE:-dev}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
-  oauth-network:
+  oauth-network-${SPRING_PROFILES_ACTIVE:-dev}:
     driver: bridge
 
 volumes:
-  uploads:
-  logs:
-  mysql_data:
+  oauth-uploads-${SPRING_PROFILES_ACTIVE:-dev}:
+  oauth-logs-${SPRING_PROFILES_ACTIVE:-dev}:
+  oauth-mysql-data-${SPRING_PROFILES_ACTIVE:-dev}:
