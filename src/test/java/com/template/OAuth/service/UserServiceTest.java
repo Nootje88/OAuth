@@ -81,14 +81,10 @@ class UserServiceTest {
                 userInfo
         );
 
-        // Mock active profiles for test environment
-        when(springEnv.getActiveProfiles()).thenReturn(new String[]{"test"});
-
         // Mock SecurityContextHolder
-        when(securityContext.getAuthentication()).thenReturn(authentication);
         SecurityContextHolder.setContext(securityContext);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.getName()).thenReturn("test@example.com");
-        when(authentication.getPrincipal()).thenReturn("test@example.com");
     }
 
     @Test
@@ -169,14 +165,12 @@ class UserServiceTest {
         // Arrange
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
 
+        // Use a real UsernamePasswordAuthenticationToken instead of trying to mock instanceof
+        Authentication realAuth = new UsernamePasswordAuthenticationToken("test@example.com", null);
+        when(securityContext.getAuthentication()).thenReturn(realAuth);
+
         // Mock active profiles for test environment
         when(springEnv.getActiveProfiles()).thenReturn(new String[]{"test"});
-
-        // Set up authentication to be a UsernamePasswordAuthenticationToken for test path
-        when(authentication.getName()).thenReturn("test@example.com");
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication instanceof UsernamePasswordAuthenticationToken).thenReturn(true);
-        SecurityContextHolder.setContext(securityContext);
 
         // Act
         User result = userService.getCurrentUser();
@@ -249,14 +243,12 @@ class UserServiceTest {
         // Arrange
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
+        // Use a real UsernamePasswordAuthenticationToken instead of trying to mock instanceof
+        Authentication realAuth = new UsernamePasswordAuthenticationToken("notfound@example.com", null);
+        when(securityContext.getAuthentication()).thenReturn(realAuth);
+
         // Mock active profiles for test environment
         when(springEnv.getActiveProfiles()).thenReturn(new String[]{"test"});
-
-        // Set up authentication to be a UsernamePasswordAuthenticationToken for test path
-        when(authentication.getName()).thenReturn("notfound@example.com");
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication instanceof UsernamePasswordAuthenticationToken).thenReturn(true);
-        SecurityContextHolder.setContext(securityContext);
 
         // Act
         User result = userService.getCurrentUser();
