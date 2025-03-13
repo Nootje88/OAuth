@@ -91,9 +91,9 @@ app:
   cors:
     allowedOrigins:
       - http://localhost:3000
-  frontend-url: ${FRONTEND_URL:http://localhost:3000}
-  login-success-redirect-url: ${LOGIN_SUCCESS_REDIRECT_URL:/home}
-  admin-emails: ${ADMIN_EMAILS:admin@yourdomain.com,diasnino@gmail.com}
+  frontend-url: ${FRONTEND_URL}
+  login-success-redirect-url: ${LOGIN_SUCCESS_REDIRECT_URL}
+  admin-emails: ${ADMIN_EMAILS}
 
 # Springdoc configuration
 springdoc:

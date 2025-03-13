@@ -27,7 +27,7 @@ public class UserService {
     @Autowired
     private Environment springEnv;
 
-    @Value("${ADMIN_EMAILS:admin@yourdomain.com,diasnino@gmail.com}")
+    @Value("${app.admin-emails}")
     private String adminEmails;
 
     /**

@@ -23,10 +23,10 @@ import java.util.Locale;
 @Component
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    @Value("${app.application.baseUrl:http://localhost:3000}")
+    @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    @Value("${LOGIN_SUCCESS_REDIRECT_URL:/home}")
+    @Value("${app.login-success-redirect-url}")
     private String loginSuccessRedirectUrl;
 
     private final UserService userService;
