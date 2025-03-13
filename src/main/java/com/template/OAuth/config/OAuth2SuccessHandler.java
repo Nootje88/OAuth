@@ -10,6 +10,8 @@ import com.template.OAuth.service.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -23,10 +25,14 @@ import java.util.Locale;
 @Component
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    @Value("${app.frontend-url}")
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2SuccessHandler.class);
+    private static final String DEFAULT_FRONTEND_URL = "http://localhost:3000";
+    private static final String DEFAULT_SUCCESS_PATH = "/home";
+
+    @Value("${app.frontend-url:#{null}}")
     private String frontendUrl;
 
-    @Value("${app.login-success-redirect-url}")
+    @Value("${app.login-success-redirect-url:#{null}}")
     private String loginSuccessRedirectUrl;
 
     private final UserService userService;
@@ -52,9 +58,23 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         this.messageService = messageService;
         this.localeResolver = localeResolver;
 
+        // Safely handle the URL formatting with null checks
+        initializeTargetUrl();
+    }
+
+    private void initializeTargetUrl() {
+        // Apply default values if properties are missing
+        if (frontendUrl == null || frontendUrl.trim().isEmpty()) {
+            frontendUrl = DEFAULT_FRONTEND_URL;
+            logger.warn("Frontend URL is not set in configuration, using default: {}", frontendUrl);
+        }
+
+        if (loginSuccessRedirectUrl == null || loginSuccessRedirectUrl.trim().isEmpty()) {
+            loginSuccessRedirectUrl = DEFAULT_SUCCESS_PATH;
+            logger.warn("Login success redirect URL is not set in configuration, using default: {}", loginSuccessRedirectUrl);
+        }
+
         // Properly format the default target URL
-        // If frontendUrl already contains http/https and loginSuccessRedirectUrl starts with /,
-        // we need to ensure we don't end up with double slashes
         String targetUrl;
         if (frontendUrl.endsWith("/") && loginSuccessRedirectUrl.startsWith("/")) {
             // Remove trailing slash from frontendUrl to prevent double slash
@@ -68,6 +88,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         }
 
         // Set the default target URL - this must start with http(s) or /
+        logger.info("Setting OAuth2 success redirect URL to: {}", targetUrl);
         setDefaultTargetUrl(targetUrl);
     }
 
