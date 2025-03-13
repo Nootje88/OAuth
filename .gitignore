@@ -1,5 +1,97 @@
-/target/
+# Environment variables - never commit these!
+.env
 .env.dev
+.env.test
 .env.pat
 .env.prod
-.env.test
+.env.*
+
+# Compiled class files and build directories
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Log files
+logs/
+*.log
+/var/log/
+
+# IDE specific files
+## IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+## VSCode
+.vscode/
+## Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# Maven specific
+.mvn/timing.properties
+# https://github.com/takari/maven-wrapper#usage-without-binary-jar
+.mvn/wrapper/maven-wrapper.jar
+
+# Build artifacts
+/bin/
+/out/
+/build/
+/.gradle/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Upload directory for local development
+/uploads/
+/app/data/uploads/
+
+# Docker related
+.docker/volumes/
+*.env
+docker/**/*.env
+
+# Generated files
+application-*.properties
+!application-example.properties
+
+# Test reports and coverage
+/coverage/
+.scannerwork/
+.sonar/
+/reports/
+.nyc_output/
+
+# Application deployment artifacts
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Node (if using for frontend)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Secrets and keys
+*.jks
+*.p12
+*.der
+*.pem
+*.pfx
+*.key
+*secret*
+*Secret*
+*SECRET*
+*password*
+*Password*
+*PASSWORD*
