@@ -297,10 +297,6 @@ The API is grouped into functional areas:
 - User Management (user and profile endpoints)
 - Administration (admin and moderator endpoints)
 
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## 🙏 Acknowledgements
 
 - Spring Boot and Spring Security
