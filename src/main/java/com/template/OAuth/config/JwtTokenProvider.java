@@ -1,6 +1,8 @@
 package com.template.OAuth.config;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,8 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey; // NOTE: javax, not jakarta
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,40 +30,49 @@ public class JwtTokenProvider {
         this.appProperties = appProperties;
     }
 
-    private Key getSigningKey() {
+    private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String email) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-        // Extract roles from authorities
         List<String> roles = userDetails.getAuthorities().stream()
-                .map(authority -> authority.getAuthority())
+                .map(a -> a.getAuthority())
                 .collect(Collectors.toList());
 
+        Date now = new Date();
+        Date exp = new Date(now.getTime() + appProperties.getSecurity().getJwt().getExpiration());
+
         return Jwts.builder()
-                .setSubject(email)
-                .claim("roles", roles)  // Add roles to JWT claims
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + appProperties.getSecurity().getJwt().getExpiration()))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .subject(email)
+                .claim("roles", roles)
+                .issuedAt(now)
+                .expiration(exp)
+                // 0.12.x: use SecureDigestAlgorithm from Jwts.SIG
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
     public String getEmailFromToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
-                .parseClaimsJws(token)
-                .getBody().getSubject();
+        return parseClaims(token).getSubject();
     }
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+            parseClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey()) // 0.12.x verifyWith(SecretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public Optional<String> getTokenFromRequest(HttpServletRequest request) {

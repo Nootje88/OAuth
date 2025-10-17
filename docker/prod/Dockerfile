@@ -1,37 +1,15 @@
-FROM eclipse-temurin:23-jdk-focal as builder
-
+FROM eclipse-temurin:23-jdk AS build
 WORKDIR /app
-
-# Copy Maven files
-COPY mvnw .
+COPY mvnw ./
 COPY .mvn .mvn
-COPY pom.xml .
+COPY pom.xml ./
+RUN chmod +x mvnw && ./mvnw -q dependency:go-offline
+COPY src ./src
+RUN ./mvnw -q -DskipTests package
 
-# Make mvnw executable
-RUN chmod +x mvnw
-
-# Download dependencies
-RUN ./mvnw dependency:go-offline
-
-# Copy source code
-COPY src src
-
-# Build application
-RUN ./mvnw clean package -DskipTests
-
-FROM eclipse-temurin:23-jre-focal
-
+FROM eclipse-temurin:23-jre
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
-
-# Create directories
-RUN mkdir -p /app/data/uploads/profiles \
-    && mkdir -p /var/log/oauth-app
-
-ENV SPRING_PROFILES_ACTIVE=prod \
-    JAVA_OPTS="-Xms1g -Xmx2g" \
-    SERVER_PORT=8080
-
-EXPOSE ${SERVER_PORT}
-
-ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar app.jar"]
+COPY --from=build /app/target/*.jar app.jar
+ENV SPRING_PROFILES_ACTIVE=prod JAVA_OPTS="-Xms1g -Xmx2g" SERVER_PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["sh","-c","java ${JAVA_OPTS} -jar app.jar --server.port=${SERVER_PORT} --spring.profiles.active=${SPRING_PROFILES_ACTIVE}"]

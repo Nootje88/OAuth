@@ -37,7 +37,7 @@ spring:
       # Authentication endpoints requests per minute per IP
       auth-limit: 100
       # Sensitive operations requests per minute per IP
-      sensitive-limit: 5
+      sensitive-limit: 3
       # Time in minutes to block IP after too many failed attempts
       block-duration-minutes: 30
       # Number of failed attempts before blocking IP
