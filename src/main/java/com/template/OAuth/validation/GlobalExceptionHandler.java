@@ -27,18 +27,24 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException ex) {
 
         Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String fieldName = (error instanceof FieldError)
+                    ? ((FieldError) error).getField()
+                    : error.getObjectName(); // fall back to object name for non-field errors
 
             // Get localized error message if message code is available
+            String defaultMessage = error.getDefaultMessage();
             String errorMessage;
-            if (error.getDefaultMessage() != null && error.getDefaultMessage().startsWith("{")
-                    && error.getDefaultMessage().endsWith("}")) {
+
+            if (defaultMessage != null && defaultMessage.startsWith("{") && defaultMessage.endsWith("}")) {
                 // Extract message code from {code}
-                String messageKey = error.getDefaultMessage().substring(1, error.getDefaultMessage().length() - 1);
+                String messageKey = defaultMessage.substring(1, defaultMessage.length() - 1);
                 errorMessage = messageService.getMessage(messageKey);
+            } else if (defaultMessage != null) {
+                errorMessage = defaultMessage;
             } else {
-                errorMessage = error.getDefaultMessage();
+                // Sensible fallback if no default message present
+                errorMessage = messageService.getMessage("validation.default");
             }
 
             errors.put(fieldName, errorMessage);

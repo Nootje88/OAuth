@@ -252,7 +252,6 @@ public class AuthController {
         Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
 
         User user;
-        boolean isNewUser = false;
         if (userOpt.isPresent()) {
             user = userOpt.get();
         } else {
@@ -262,7 +261,6 @@ public class AuthController {
             user.setPicture(loginRequest.getPicture());
             user.setPrimaryProvider(com.template.OAuth.enums.AuthProvider.GOOGLE);
             user.setEnabled(true); // OAuth users are automatically verified
-            isNewUser = true;
             userRepository.save(user);
 
             // Record metrics for new user registration

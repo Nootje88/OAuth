@@ -1,7 +1,6 @@
 package com.template.OAuth.security;
 
 import com.template.OAuth.entities.User;
-import com.template.OAuth.enums.Role;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

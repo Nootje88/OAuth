@@ -37,21 +37,16 @@ public class RoleBasedAuthorizationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    private User adminUser;
-    private User regularUser;
-    private User moderatorUser;
-    private User premiumUser;
-
     @BeforeEach
     void setUp() {
         // Clean up
         userRepository.deleteAll();
 
         // Create users with different roles
-        adminUser = createUserWithRole("admin@example.com", "Admin Name", AuthProvider.LOCAL, Role.ADMIN);
-        regularUser = createUserWithRole("user@example.com", "User Name", AuthProvider.LOCAL, Role.USER);
-        moderatorUser = createUserWithRole("moderator@example.com", "Moderator Name", AuthProvider.LOCAL, Role.MODERATOR);
-        premiumUser = createUserWithRole("premium@example.com", "Premium Name", AuthProvider.LOCAL, Role.PREMIUM);
+        createUserWithRole("admin@example.com", "Admin Name", AuthProvider.LOCAL, Role.ADMIN);
+        createUserWithRole("user@example.com", "User Name", AuthProvider.LOCAL, Role.USER);
+        createUserWithRole("moderator@example.com", "Moderator Name", AuthProvider.LOCAL, Role.MODERATOR);
+        createUserWithRole("premium@example.com", "Premium Name", AuthProvider.LOCAL, Role.PREMIUM);
     }
 
     private User createUserWithRole(String email, String name, AuthProvider provider, Role role) {

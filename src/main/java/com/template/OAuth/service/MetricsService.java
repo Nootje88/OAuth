@@ -99,25 +99,40 @@ public class MetricsService {
 
     // API metrics methods
     public <T> T recordApiRequestTime(String apiName, Supplier<T> supplier) {
-        return Timer.builder("api.request.duration")
-                .tag("api", apiName)
-                .register(meterRegistry)
-                .record(supplier);
+        long start = System.nanoTime();
+        try {
+            return supplier.get();
+        } finally {
+            long durationNanos = System.nanoTime() - start;
+            // per-API timer
+            Timer.builder("api.request.duration")
+                    .tag("api", apiName)
+                    .register(meterRegistry)
+                    .record(durationNanos, TimeUnit.NANOSECONDS);
+            // aggregate timer (uses the initialized field)
+            apiRequestTimer.record(durationNanos, TimeUnit.NANOSECONDS);
+        }
     }
 
     public void recordApiRequestTime(String apiName, long timeInMs) {
+        // per-API timer
         Timer.builder("api.request.duration")
                 .tag("api", apiName)
                 .register(meterRegistry)
                 .record(timeInMs, TimeUnit.MILLISECONDS);
+        // aggregate timer (uses the initialized field)
+        apiRequestTimer.record(timeInMs, TimeUnit.MILLISECONDS);
     }
 
     // Error metrics methods
     public void incrementError(String errorType) {
+        // per-type counter
         Counter.builder("app.error")
                 .tag("type", errorType)
                 .register(meterRegistry)
                 .increment();
+        // aggregate counter (uses the initialized field)
+        errorCounter.increment();
     }
 
     // Custom counter method

@@ -61,13 +61,12 @@ class AuthenticationFlowTest {
     @Test
     void testRegistrationAndLogin() throws Exception {
         // Step 1: Register the user
-        MvcResult registrationResult = mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registrationRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.email").value("integration@example.com"))
-                .andReturn();
+                .andExpect(jsonPath("$.email").value("integration@example.com"));
 
         // Extract verification token from backend logic in a real scenario
         // For this integration test, we'd manually set the user to verified in DB

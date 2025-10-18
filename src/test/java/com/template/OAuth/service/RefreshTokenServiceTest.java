@@ -3,7 +3,6 @@ package com.template.OAuth.service;
 import com.template.OAuth.config.AppProperties;
 import com.template.OAuth.config.JwtTokenProvider;
 import com.template.OAuth.config.RefreshTokenProvider;
-import com.template.OAuth.dto.RefreshTokenResponse;
 import com.template.OAuth.entities.RefreshToken;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.repositories.RefreshTokenRepository;

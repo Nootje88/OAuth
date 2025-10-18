@@ -20,9 +20,9 @@ public class DatabaseHealthIndicator implements HealthIndicator {
     public Health health() {
         try {
             // Perform a simple DB query to check connection
-            int result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+            Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
 
-            if (result == 1) {
+            if (result != null && result == 1) {
                 return Health.up()
                         .withDetail("database", "MySQL")
                         .withDetail("status", "Available")
@@ -31,7 +31,7 @@ public class DatabaseHealthIndicator implements HealthIndicator {
                 return Health.down()
                         .withDetail("database", "MySQL")
                         .withDetail("status", "Unavailable")
-                        .withDetail("error", "Database query returned unexpected result")
+                        .withDetail("error", "Database query returned unexpected or null result")
                         .build();
             }
         } catch (Exception e) {

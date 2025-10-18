@@ -273,6 +273,7 @@ public class UserService {
             case SPOTIFY -> user.setSpotifyId(providerId);
             case APPLE -> user.setAppleId(providerId);
             case SOUNDCLOUD -> user.setSoundcloudId(providerId);
+            case LOCAL -> { /* no external provider ID to set for LOCAL */ }
         }
     }
 

@@ -7,7 +7,6 @@ import com.template.OAuth.dto.RefreshTokenResponse;
 import com.template.OAuth.entities.RefreshToken;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.repositories.RefreshTokenRepository;
-import com.template.OAuth.repositories.UserRepository;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,8 +21,7 @@ public class RefreshTokenService {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    // Removed unused UserRepository
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
@@ -82,13 +80,16 @@ public class RefreshTokenService {
             cookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
             cookie.setPath("/");
             cookie.setMaxAge((int)(appProperties.getSecurity().getJwt().getExpiration() / 1000));
+            // Ensure SameSite set on the access token cookie as well
+            cookie.setAttribute("SameSite", appProperties.getSecurity().getCookie().getSameSite());
             response.addCookie(cookie);
 
             // Set refresh token in a different cookie
             Cookie refreshCookie = new Cookie("refresh_token", newRefreshToken);
             refreshCookie.setHttpOnly(true);
             refreshCookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
-            cookie.setAttribute("SameSite", appProperties.getSecurity().getCookie().getSameSite());
+            // Fix: set attribute on the correct cookie
+            refreshCookie.setAttribute("SameSite", appProperties.getSecurity().getCookie().getSameSite());
             refreshCookie.setPath("/refresh-token");
             refreshCookie.setMaxAge((int)(appProperties.getSecurity().getRefresh().getExpiration() / 1000));
             response.addCookie(refreshCookie);

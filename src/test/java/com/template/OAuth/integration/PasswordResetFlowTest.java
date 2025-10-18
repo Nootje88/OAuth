@@ -1,7 +1,6 @@
 package com.template.OAuth.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.template.OAuth.dto.EmailRegistrationRequest;
 import com.template.OAuth.dto.PasswordResetCompletion;
 import com.template.OAuth.dto.PasswordResetRequest;
 import com.template.OAuth.entities.User;

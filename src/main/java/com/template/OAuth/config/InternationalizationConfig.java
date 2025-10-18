@@ -4,6 +4,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -24,6 +25,7 @@ public class InternationalizationConfig implements WebMvcConfigurer {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasenames("i18n/messages");
         messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false); // Prevent fallback to system locale
         return messageSource;
     }
 
@@ -32,6 +34,7 @@ public class InternationalizationConfig implements WebMvcConfigurer {
      */
     @Bean
     public LocaleResolver localeResolver() {
+        // Spring 6+ recommends using the constructor instead of setCookieName()
         CookieLocaleResolver resolver = new CookieLocaleResolver("locale");
         resolver.setDefaultLocale(Locale.US); // Default to US English
         resolver.setCookieMaxAge(Duration.ofHours(1)); // Cookie expires after 1 hour
@@ -53,7 +56,7 @@ public class InternationalizationConfig implements WebMvcConfigurer {
      * Register the locale change interceptor
      */
     @Override
-    public void addInterceptors(InterceptorRegistry registry) {
+    public void addInterceptors(@NonNull InterceptorRegistry registry) {
         registry.addInterceptor(localeChangeInterceptor());
     }
 }
