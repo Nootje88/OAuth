@@ -16,16 +16,20 @@ spring:
 app:
   security:
     cookie:
-      secure: true  # Require HTTPS for cookies
-      same-site: strict
+      secure: true            # required when SameSite=None
+      sameSite: None          # cross-site cookie (frontend on different domain)
+      domain: ".yourdomain.com"  # share cookies across subdomains
+      # partitioned: false     # only if you explicitly need CHIPS
     jwt:
-      expiration: 1800000  # 30 minutes
+      expiration: 1800000     # 30 minutes
     refresh:
       expiration: 2592000000  # 30 days
   profile:
     upload-dir: /app/data/uploads/profiles
   cors:
-    allowed-origins: https://www.yourdomain.com
+    allowed-origins:
+      - https://www.yourdomain.com
+      - https://admin.yourdomain.com
 
 # Logging configuration for production (minimal)
 logging:
@@ -50,4 +54,3 @@ server:
     key-alias: tomcat
   http2:
     enabled: true
-

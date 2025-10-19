@@ -1,62 +1,35 @@
 package com.template.OAuth.config;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.templatemode.TemplateMode;
+import java.util.Set;
+
 
 import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 @Configuration
+@EnableConfigurationProperties(AppProperties.class)
 public class EmailConfig {
 
-    private final AppProperties appProperties;
 
-    public EmailConfig(AppProperties appProperties) {
-        this.appProperties = appProperties;
-    }
-
+    // Thymeleaf template resolver for email templates (classpath:/templates/mail/*.html)
     @Bean
-    public JavaMailSender javaMailSender() {
-        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-        mailSender.setHost(appProperties.getEmail().getHost());
-        mailSender.setPort(appProperties.getEmail().getPort());
-        mailSender.setUsername(appProperties.getEmail().getUsername());
-        mailSender.setPassword(appProperties.getEmail().getPassword());
-
-        Properties props = mailSender.getJavaMailProperties();
-        props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.debug", appProperties.getEmail().isDebug());
-
-        return mailSender;
-    }
-
-    @Bean
-    @Primary
     public SpringResourceTemplateResolver emailTemplateResolver() {
-        SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
-        templateResolver.setPrefix("classpath:/templates/email/");
-        templateResolver.setSuffix(".html");
-        templateResolver.setTemplateMode(TemplateMode.HTML);
-        templateResolver.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        templateResolver.setOrder(1);
-        templateResolver.setCheckExistence(true);
+        SpringResourceTemplateResolver r = new SpringResourceTemplateResolver();
+        r.setPrefix("classpath:/templates/");     // keep this generic
+        r.setSuffix(".html");
+        r.setTemplateMode(TemplateMode.HTML);
+        r.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        r.setCheckExistence(true);
 
-        return templateResolver;
-    }
+        // Only resolve templates under "mail/*" so it won't clash with web views
+        r.setResolvablePatterns(Set.of("mail/*"));
+        r.setOrder(1); // higher priority than default (which is usually 10)
+        return r;
+}
 
-    @Bean
-    public SpringTemplateEngine templateEngine(SpringResourceTemplateResolver templateResolver) {
-        SpringTemplateEngine templateEngine = new SpringTemplateEngine();
-        templateEngine.setTemplateResolver(templateResolver);
-        templateEngine.setEnableSpringELCompiler(true);
-        return templateEngine;
-    }
+    
 }

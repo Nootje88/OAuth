@@ -1,28 +1,34 @@
 package com.template.OAuth.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNull;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.time.Duration;
+import java.util.List;
 
 @Configuration
-public class CorsConfig implements WebMvcConfigurer {
+public class CorsConfig {
 
-    @Value("${FRONTEND_URL:http://localhost:3000}")
-    private String frontendUrl;
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(AppProperties appProperties) {
+        CorsConfiguration cfg = new CorsConfiguration();
 
-    @Override
-    public void addCorsMappings(@NonNull CorsRegistry registry) {
-        // allow comma-separated list in FRONTEND_URL (e.g., http://localhost:3000,http://127.0.0.1:3000)
-        String[] origins = frontendUrl.split("\\s*,\\s*");
+        // Allow credentials requires specific origins (not "*")
+        cfg.setAllowCredentials(true);
+        cfg.setAllowedOrigins(appProperties.getCors().getAllowedOrigins()); // from application*.yaml
 
-        registry.addMapping("/**")
-                // Use allowedOrigins for exact origins. If you need wildcards, switch to allowedOriginPatterns().
-                .allowedOrigins(origins)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
-                .allowCredentials(true)
-                .maxAge(3600);
+        // Methods/headers
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        cfg.addAllowedHeader(CorsConfiguration.ALL);
+
+        // Cache preflight responses
+        cfg.setMaxAge(Duration.ofHours(1));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+        return source;
     }
 }

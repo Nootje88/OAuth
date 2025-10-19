@@ -27,21 +27,21 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler; // <-- NEW
     private final CorsConfigurationSource corsConfigurationSource;
     private final CustomUserDetailsService userDetailsService;
-    private final AppProperties appProperties;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             OAuth2SuccessHandler oAuth2SuccessHandler,
+            OAuth2FailureHandler oAuth2FailureHandler,    // <-- NEW
             CorsConfigurationSource corsConfigurationSource,
-            CustomUserDetailsService userDetailsService,
-            AppProperties appProperties) {
+            CustomUserDetailsService userDetailsService) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.oAuth2SuccessHandler = oAuth2SuccessHandler;
+        this.oAuth2FailureHandler = oAuth2FailureHandler; // <-- NEW
         this.corsConfigurationSource = corsConfigurationSource;
         this.userDetailsService = userDetailsService;
-        this.appProperties = appProperties;
     }
 
     @Bean
@@ -49,7 +49,6 @@ public class SecurityConfig {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
-
         return new ProviderManager(authProvider);
     }
 
@@ -80,72 +79,59 @@ public class SecurityConfig {
                 "/management/info"
         };
 
-        // Configure CSRF token handler
+        // CSRF token handler
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-        // Ensure token is included in the request attribute
         requestHandler.setCsrfRequestAttributeName(null);
 
         http
-                // Configure CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+            // CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
-                // Configure CSRF - enable for state-changing operations but disable for auth endpoints
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .csrfTokenRequestHandler(requestHandler)
-                        .ignoringRequestMatchers(
-                                "/auth/**",
-                                "/oauth2/**",
-                                "/login/oauth2/**",
-                                "/refresh-token"
-                        )
+            // CSRF (enabled globally, ignored for auth/OAuth/refresh)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRequestHandler(requestHandler)
+                .ignoringRequestMatchers(
+                    "/auth/**",
+                    "/oauth2/**",
+                    "/login/oauth2/**",
+                    "/refresh-token"
                 )
+            )
 
-                // Configure exception handling
-                .exceptionHandling(e -> e
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-                )
+            // 401 for unauthenticated API access
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+            )
 
-                // Configure authorization rules
-                .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers(publicEndpoints).permitAll()
+            // Authorization rules
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(publicEndpoints).permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/moderator/**").hasAnyRole("ADMIN", "MODERATOR")
+                .requestMatchers("/api/premium/**").hasAnyRole("ADMIN", "PREMIUM")
+                .requestMatchers("/api/user/**").authenticated()
+                .requestMatchers("/management/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
 
-                        // OPTIONS requests (needed for CORS preflight)
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            // Stateless
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
-                        // Admin endpoints
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+            // OAuth2 login: success + failure handlers
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(oAuth2SuccessHandler)
+                .failureHandler(oAuth2FailureHandler) // <-- use the handler instead of failureUrl
+            )
 
-                        // Moderator endpoints
-                        .requestMatchers("/api/moderator/**").hasAnyRole("ADMIN", "MODERATOR")
+            // Add JWT filter
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-                        // Premium user endpoints
-                        .requestMatchers("/api/premium/**").hasAnyRole("ADMIN", "PREMIUM")
-
-                        // User endpoints
-                        .requestMatchers("/api/user/**").authenticated()
-
-                        // Management endpoints (except health and info)
-                        .requestMatchers("/management/**").hasRole("ADMIN")
-
-                        // All other endpoints require authentication
-                        .anyRequest().authenticated()
-                )
-
-                // Configure session management
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-
-                // Configure OAuth2 login
-                .oauth2Login(oauth2 -> oauth2
-                        .successHandler(oAuth2SuccessHandler)
-                        .failureUrl(appProperties.getApplication().getBaseUrl() + "/login?error=true")
-                )
-
-                // Add custom JWT filter
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // If you ever enable form login, wire your AuthenticationFailureHandler here:
+        // .formLogin(form -> form.failureHandler(authenticationFailureHandler))
 
         return http.build();
     }

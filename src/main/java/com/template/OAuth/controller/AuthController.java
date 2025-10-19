@@ -1,16 +1,14 @@
 package com.template.OAuth.controller;
 
 import com.template.OAuth.annotation.Auditable;
+import com.template.OAuth.config.AppProperties;
 import com.template.OAuth.config.JwtTokenProvider;
 import com.template.OAuth.dto.*;
 import com.template.OAuth.entities.User;
 import com.template.OAuth.enums.AuditEventType;
-import com.template.OAuth.repositories.RefreshTokenRepository;
 import com.template.OAuth.repositories.UserRepository;
-import com.template.OAuth.service.AuditService;
-import com.template.OAuth.service.AuthService;
-import com.template.OAuth.service.MessageService;
-import com.template.OAuth.service.MetricsService;
+import com.template.OAuth.service.*;
+import com.template.OAuth.util.CookieUtil;
 import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,7 +18,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -34,33 +31,35 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 @Tag(name = "Authentication", description = "Authentication management endpoints")
 public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final AuditService auditService;
     private final MetricsService metricsService;
     private final MessageService messageService;
     private final AuthService authService;
+    private final RefreshTokenService refreshTokenService;
+    private final AppProperties appProperties;
 
     @Autowired
     public AuthController(JwtTokenProvider jwtTokenProvider,
                           UserRepository userRepository,
-                          RefreshTokenRepository refreshTokenRepository,
                           AuditService auditService,
                           MetricsService metricsService,
                           MessageService messageService,
-                          AuthService authService) {
+                          AuthService authService,
+                          RefreshTokenService refreshTokenService,
+                          AppProperties appProperties) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
         this.auditService = auditService;
         this.metricsService = metricsService;
         this.messageService = messageService;
         this.authService = authService;
+        this.refreshTokenService = refreshTokenService;
+        this.appProperties = appProperties;
     }
 
     @Operation(summary = "Register a new user with email and password",
@@ -70,7 +69,7 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Invalid input data or email already in use",
                     content = @Content)
     })
-    @SecurityRequirements // No security requirements for registration endpoint
+    @SecurityRequirements
     @PostMapping("/register")
     @Timed(value = "auth.register.time", description = "Time taken to register new user")
     public ResponseEntity<Map<String, String>> registerUser(
@@ -79,8 +78,6 @@ public class AuthController {
 
         try {
             User user = authService.registerUser(registrationRequest);
-
-            // Record metrics for new user registration
             metricsService.incrementRegistration();
 
             Map<String, String> response = new HashMap<>();
@@ -101,29 +98,23 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Invalid or expired token",
                     content = @Content)
     })
-    @SecurityRequirements // No security requirements for verification endpoint
+    @SecurityRequirements
     @GetMapping("/verify-email")
-    public ResponseEntity<Map<String, String>> verifyEmail(
-            @Parameter(description = "Verification token", required = true)
-            @RequestParam String token) {
-
+    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         try {
-            boolean verified = authService.verifyEmail(token);
-
-            Map<String, String> response = new HashMap<>();
-            if (verified) {
-                response.put("message", messageService.getMessage("email.verified"));
-                return ResponseEntity.ok(response);
+            boolean ok = authService.verifyEmail(token);
+            if (ok) {
+                String redirect = appProperties.getApplication().getBaseUrl() + "/login?verified=1";
+                return ResponseEntity.status(302).header("Location", redirect).build(); 
             } else {
-                response.put("message", messageService.getMessage("email.verification.failed"));
-                return ResponseEntity.badRequest().body(response);
+                Map<String,String> body = Map.of("message", "Invalid or expired verification token");
+                return ResponseEntity.badRequest().body(body);
             }
         } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
+    
 
     @Operation(summary = "Resend verification email",
             description = "Resends the verification email for unverified accounts")
@@ -132,7 +123,7 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Invalid email or account already verified",
                     content = @Content)
     })
-    @SecurityRequirements // No security requirements for resend verification
+    @SecurityRequirements
     @PostMapping("/resend-verification")
     public ResponseEntity<Map<String, String>> resendVerificationEmail(
             @Parameter(description = "Email address", required = true)
@@ -156,7 +147,7 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Password reset email sent successfully")
     })
-    @SecurityRequirements // No security requirements for password reset
+    @SecurityRequirements
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(
             @Parameter(description = "Password reset request", required = true)
@@ -164,7 +155,6 @@ public class AuthController {
 
         authService.initiatePasswordReset(resetRequest.getEmail());
 
-        // Always return success, even if email doesn't exist (security measure)
         Map<String, String> response = new HashMap<>();
         response.put("message", messageService.getMessage("email.password.reset.sent"));
         return ResponseEntity.ok(response);
@@ -177,7 +167,7 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Invalid or expired token",
                     content = @Content)
     })
-    @SecurityRequirements // No security requirements for password reset
+    @SecurityRequirements
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(
             @Parameter(description = "Password reset completion data", required = true)
@@ -209,7 +199,7 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Invalid credentials or unverified account",
                     content = @Content)
     })
-    @SecurityRequirements // No security requirements for login endpoint
+    @SecurityRequirements
     @PostMapping("/email-login")
     @Timed(value = "auth.email.login.time", description = "Time taken to perform email login")
     public ResponseEntity<AuthResponse> loginWithEmail(
@@ -219,15 +209,10 @@ public class AuthController {
 
         try {
             authService.authenticateAndGenerateTokens(loginRequest, response);
-
-            // Record metrics for successful login
             metricsService.incrementAuthSuccess();
-
             return ResponseEntity.ok(new AuthResponse(null, messageService.getMessage("auth.login.success")));
         } catch (Exception e) {
-            // Record metrics for failed login
             metricsService.incrementAuthFailure();
-
             return ResponseEntity.badRequest().body(new AuthResponse(null, e.getMessage()));
         }
     }
@@ -240,7 +225,7 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Invalid credentials",
                     content = @Content)
     })
-    @SecurityRequirements // No security requirements for login endpoint
+    @SecurityRequirements
     @PostMapping("/login")
     @Auditable(type = AuditEventType.LOGIN_SUCCESS, description = "User login")
     @Timed(value = "auth.login.time", description = "Time taken to perform login")
@@ -250,7 +235,6 @@ public class AuthController {
             HttpServletResponse response) {
 
         Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
-
         User user;
         if (userOpt.isPresent()) {
             user = userOpt.get();
@@ -260,31 +244,21 @@ public class AuthController {
             user.setName(loginRequest.getName());
             user.setPicture(loginRequest.getPicture());
             user.setPrimaryProvider(com.template.OAuth.enums.AuthProvider.GOOGLE);
-            user.setEnabled(true); // OAuth users are automatically verified
+            user.setEnabled(true);
             userRepository.save(user);
 
-            // Record metrics for new user registration
             metricsService.incrementRegistration();
-
-            // Audit new user creation
             auditService.logEvent(AuditEventType.USER_CREATED,
                     messageService.getMessage("user.created"),
                     "Email: " + user.getEmail());
         }
 
         String token = jwtTokenProvider.generateToken(user.getEmail());
+        long accessTtlSeconds = appProperties.getSecurity().getJwt().getExpiration() / 1000;
 
-        Cookie cookie = new Cookie("jwt", token);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Set to true in production
-        cookie.setPath("/");
-        cookie.setMaxAge(3600); // 1 hour expiration
-        response.addCookie(cookie);
+        CookieUtil.addCookie(response, "jwt", token, "/", accessTtlSeconds, appProperties);
 
-        // Record metrics for successful login
         metricsService.incrementAuthSuccess();
-
-        // Audit successful login
         auditService.logEvent(AuditEventType.LOGIN_SUCCESS,
                 messageService.getMessage("auth.login.success"),
                 "Email: " + user.getEmail());
@@ -317,7 +291,6 @@ public class AuthController {
             }
         }
 
-        // Record metrics for unauthorized access
         metricsService.incrementError("unauthorized");
 
         Map<String, String> errorResponse = new HashMap<>();
@@ -336,42 +309,24 @@ public class AuthController {
     @Auditable(type = AuditEventType.LOGOUT, description = "User logout")
     @Timed(value = "auth.logout.time", description = "Time taken to logout")
     public ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response) {
-        // Get current user email from the token for audit logging
+        // Extract current user (if JWT present); logout should still clear cookies even if not
         String userEmail = "anonymous";
         Optional<String> tokenOpt = jwtTokenProvider.getTokenFromRequest(request);
         if (tokenOpt.isPresent()) {
             try {
                 userEmail = jwtTokenProvider.getEmailFromToken(tokenOpt.get());
-            } catch (Exception e) {
-                // Token might be invalid, just continue with logout
+            } catch (Exception ignored) {
             }
         }
 
-        // Clear JWT cookie
-        Cookie jwtCookie = new Cookie("jwt", null);
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setSecure(false); // Set to true in production
-        jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(0);
-        response.addCookie(jwtCookie);
+        // Clear cookies (must match exact paths used when setting them)
+        CookieUtil.addCookie(response, "jwt", "", "/", 0, appProperties);
+        CookieUtil.addCookie(response, "refresh_token", "", "/refresh-token", 0, appProperties);
 
-        // Clear refresh token cookie
-        Cookie refreshCookie = new Cookie("refresh_token", null);
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(false); // Set to true in production
-        refreshCookie.setPath("/refresh-token");
-        refreshCookie.setMaxAge(0);
-        response.addCookie(refreshCookie);
-
-        // Clean up refresh tokens for this user
+        // Revoke refresh tokens by USER
         if (!"anonymous".equals(userEmail)) {
-            userRepository.findByEmail(userEmail).ifPresent(user ->
-                    refreshTokenRepository.deleteByUser(user));
-
-            // Record metrics for logout
+            refreshTokenService.revokeAllForUser(userEmail);
             metricsService.incrementLogout();
-
-            // Audit logout event
             auditService.logEvent(AuditEventType.LOGOUT,
                     messageService.getMessage("auth.logout.success"),
                     "Email: " + userEmail);
@@ -387,7 +342,7 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Login URL retrieved successfully")
     })
-    @SecurityRequirements // No security requirements for login URL endpoint
+    @SecurityRequirements
     @GetMapping("/login-url")
     public ResponseEntity<String> getLoginUrl() {
         return ResponseEntity.ok("/oauth2/authorization/google");

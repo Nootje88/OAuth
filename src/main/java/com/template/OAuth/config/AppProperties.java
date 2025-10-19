@@ -32,8 +32,30 @@ public class AppProperties {
         @Getter
         @Setter
         public static class Cookie {
+            /**
+             * When true, sets the 'Secure' attribute on cookies so they are only sent over HTTPS.
+             * Use true in staging/prod (HTTPS), false for local http://localhost dev.
+             */
             private boolean secure = false;
-            private String sameSite = "lax";
+
+            /**
+             * SameSite policy for cookies. Valid values: "Lax", "Strict", "None".
+             * Use "None" ONLY when you need cross-site cookies (e.g., frontend on a different domain),
+             * and only together with secure=true (HTTPS), otherwise browsers will drop the cookie.
+             */
+            private String sameSite = "Lax";
+
+            /**
+             * Cookie domain, e.g. ".yourdomain.com" to share across subdomains.
+             * Leave null/empty for localhost.
+             */
+            private String domain;
+
+            /**
+             * Optional: send the 'Partitioned' attribute (CHIPS) together with SameSite=None.
+             * Only enable if you explicitly need it and understand the implications.
+             */
+            private boolean partitioned = false;
         }
 
         @Getter
@@ -104,5 +126,6 @@ public class AppProperties {
         private String baseUrl = "http://localhost:3000";
         private String supportEmail = "support@example.com";
         private String name = "OAuth Template";
+        private String verifyBaseUrl = "http://localhost:8080";
     }
 }

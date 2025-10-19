@@ -7,7 +7,7 @@ import com.template.OAuth.service.AuditService;
 import com.template.OAuth.service.MessageService;
 import com.template.OAuth.service.RefreshTokenService;
 import com.template.OAuth.service.UserService;
-import jakarta.servlet.http.Cookie;
+import com.template.OAuth.util.CookieUtil; // <-- NEW
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -114,21 +114,30 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 // Generate refresh token
                 RefreshToken refreshToken = refreshTokenService.generateRefreshToken(user);
 
-                // Set JWT in HTTP-only cookie
-                Cookie cookie = new Cookie("jwt", token);
-                cookie.setHttpOnly(true);
-                cookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
-                cookie.setPath("/");
-                cookie.setMaxAge((int)(appProperties.getSecurity().getJwt().getExpiration() / 1000));
-                response.addCookie(cookie);
+                // ---- NEW: Centralized cookie creation with CookieUtil ----
+                long accessTtlSeconds = appProperties.getSecurity().getJwt().getExpiration() / 1000;
+                long refreshTtlSeconds = appProperties.getSecurity().getRefresh().getExpiration() / 1000;
 
-                // Set refresh token in a different cookie
-                Cookie refreshCookie = new Cookie("refresh_token", refreshToken.getToken());
-                refreshCookie.setHttpOnly(true);
-                refreshCookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
-                refreshCookie.setPath("/refresh-token");
-                refreshCookie.setMaxAge((int)(appProperties.getSecurity().getRefresh().getExpiration() / 1000));
-                response.addCookie(refreshCookie);
+                // Access token cookie (HttpOnly, Secure, SameSite, Domain via CookieUtil)
+                CookieUtil.addCookie(
+                        response,
+                        "jwt",
+                        token,
+                        "/",                    // accessible across the API
+                        accessTtlSeconds,
+                        appProperties
+                );
+
+                // Refresh token cookie (optionally scope to refresh endpoint)
+                CookieUtil.addCookie(
+                        response,
+                        "refresh_token",
+                        refreshToken.getToken(),
+                        "/refresh-token",       // tighter path scope for refresh flow
+                        refreshTtlSeconds,
+                        appProperties
+                );
+                // ----------------------------------------------------------
 
                 // Audit successful OAuth login
                 boolean isNewUser = user.getLoginCount() == 1;

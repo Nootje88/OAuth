@@ -12,7 +12,7 @@ import com.template.OAuth.enums.NotificationType;
 import com.template.OAuth.enums.Role;
 import com.template.OAuth.repositories.UserRepository;
 import com.template.OAuth.security.UserPrincipal;
-import jakarta.servlet.http.Cookie;
+import com.template.OAuth.util.CookieUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -85,7 +85,7 @@ public class AuthService {
         // Assign default USER role
         user.addRole(Role.USER);
 
-        // Set default notification preferences
+        // Default notification preferences
         user.enableNotification(NotificationType.EMAIL_SECURITY);
         user.enableNotification(NotificationType.IN_APP_GENERAL);
 
@@ -106,37 +106,39 @@ public class AuthService {
     }
 
     @Transactional
-    public boolean verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid verification token"));
+public boolean verifyEmail(String token) {
+    var opt = userRepository.findByVerificationToken(token);
+    if (opt.isEmpty()) {
+        // Token not found — either already used (user enabled & token cleared) or invalid
+        // If you want to be extra nice, you can return false here and let controller decide the message.
+        return false;
+    }
 
-        // Check if token is expired
-        if (user.getVerificationTokenExpiry().isBefore(Instant.now())) {
-            throw new RuntimeException("Verification token has expired");
-        }
-
-        // Enable user account
-        user.setEnabled(true);
-        user.setVerificationToken(null);
-        user.setVerificationTokenExpiry(null);
-
-        // Record first login
-        user.recordLogin();
-
-        userRepository.save(user);
-
-        // Send welcome email
-        emailService.sendWelcomeEmail(user.getEmail(), user.getName());
-
-        // Log the event
-        auditService.logEvent(
-                AuditEventType.USER_UPDATED,
-                "User email verified",
-                "User: " + user.getEmail()
-        );
-
+    User user = opt.get();
+    if (user.isEnabled()) {
+        // Idempotent: treat as success
         return true;
     }
+
+    if (user.getVerificationTokenExpiry() != null &&
+        user.getVerificationTokenExpiry().isBefore(Instant.now())) {
+        return false;
+    }
+
+    user.setEnabled(true);
+    user.setVerificationToken(null);
+    user.setVerificationTokenExpiry(null);
+    userRepository.save(user);
+
+    emailService.sendWelcomeEmail(user.getEmail(), user.getName());
+    auditService.logEvent(
+            AuditEventType.USER_UPDATED,
+            "User email verified",
+            "User: " + user.getEmail()
+    );
+    return true;
+}
+
 
     @Transactional
     public void resendVerificationEmail(String email) {
@@ -200,7 +202,8 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("Invalid password reset token"));
 
         // Check if token is expired
-        if (user.getPasswordResetTokenExpiry().isBefore(Instant.now())) {
+        if (user.getPasswordResetTokenExpiry() != null &&
+            user.getPasswordResetTokenExpiry().isBefore(Instant.now())) {
             throw new RuntimeException("Password reset token has expired");
         }
 
@@ -224,7 +227,7 @@ public class AuthService {
     @Transactional
     public void authenticateAndGenerateTokens(EmailLoginRequest loginRequest, HttpServletResponse response) {
         try {
-            // Authenticate with Spring Security
+            // Authenticate via Spring Security
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getEmail(),
@@ -247,23 +250,31 @@ public class AuthService {
             // Generate refresh token
             RefreshToken refreshToken = refreshTokenService.generateRefreshToken(user);
 
-            // Store in HTTP-only cookies
-            Cookie cookie = new Cookie("jwt", token);
-            cookie.setHttpOnly(true);
-            cookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
-            cookie.setPath("/");
-            cookie.setMaxAge((int) (appProperties.getSecurity().getJwt().getExpiration() / 1000));
-            response.addCookie(cookie);
+            // Cookie TTLs
+            long accessTtlSeconds = appProperties.getSecurity().getJwt().getExpiration() / 1000;
+            long refreshTtlSeconds = appProperties.getSecurity().getRefresh().getExpiration() / 1000;
 
-            // Set refresh token in a different cookie
-            Cookie refreshCookie = new Cookie("refresh_token", refreshToken.getToken());
-            refreshCookie.setHttpOnly(true);
-            refreshCookie.setSecure(appProperties.getSecurity().getCookie().isSecure());
-            refreshCookie.setPath("/refresh-token");
-            refreshCookie.setMaxAge((int) (appProperties.getSecurity().getRefresh().getExpiration() / 1000));
-            response.addCookie(refreshCookie);
+            // Access token cookie
+            CookieUtil.addCookie(
+                    response,
+                    "jwt",
+                    token,
+                    "/",
+                    accessTtlSeconds,
+                    appProperties
+            );
 
-            // Log successful login
+            // Refresh token cookie (path-scoped)
+            CookieUtil.addCookie(
+                    response,
+                    "refresh_token",
+                    refreshToken.getToken(),
+                    "/refresh-token",
+                    refreshTtlSeconds,
+                    appProperties
+            );
+
+            // Log success
             auditService.logEvent(
                     AuditEventType.LOGIN_SUCCESS,
                     "User logged in with email and password",
@@ -287,7 +298,7 @@ public class AuthService {
         }
     }
 
-    // Utility method to generate a secure random token
+    // Utility: secure random token
     private String generateToken() {
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);

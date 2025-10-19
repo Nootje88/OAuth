@@ -1,10 +1,14 @@
 # Development Environment Configuration
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
@@ -14,17 +18,59 @@ spring:
       hibernate:
         format_sql: true
 
-# Cookie settings for development
+  # ---- Mailtrap SMTP for dev ----
+  mail:
+    host: ${EMAIL_HOST:sandbox.smtp.mailtrap.io}
+    port: ${EMAIL_PORT:587}
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: false
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+      mail.debug: ${EMAIL_DEBUG:false}
+
+# App settings (dev)
 app:
+  # URLs & metadata used by EmailService and frontend redirects
+  application:
+    baseUrl: ${APP_BASE_URL:http://localhost:3000}
+    verifyBaseUrl: ${VERIFY_BASE_URL:http://localhost:8080}
+    supportEmail: ${SUPPORT_EMAIL:support@yourdomain.com}
+    name: ${APP_NAME:OAuth Template}
+
+  # Email presentation (From header)
+  email:
+    fromAddress: ${EMAIL_FROM_ADDRESS:no-reply@yourdomain.com}
+    fromName: ${EMAIL_FROM_NAME:OAuth Template App}
+
+  # Cookies & security (dev)
   security:
     cookie:
-      secure: false  # Allows cookies over HTTP in dev
-  profile:
-    upload-dir: uploads/profiles/dev
-  cors:
-    allowed-origins: http://localhost:3000
+      secure: false
+      sameSite: Lax
+      # domain:                # leave empty for localhost
 
-# Logging configuration for development (more verbose)
+  # File uploads (dev)
+  profile:
+    upload-dir: ${UPLOAD_DIR:uploads/profiles/dev}
+
+  # CORS
+  cors:
+    allowed-origins:
+      - ${FRONTEND_URL:http://localhost:3000}
+      - http://localhost:5173
+
+  # (Optional) legacy fields some code may reference
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  login-success-redirect-url: ${LOGIN_SUCCESS_REDIRECT_URL:/home}
+  mail:
+    enabled: true
+
+# Logging (verbose in dev)
 logging:
   level:
     root: INFO
@@ -34,7 +80,6 @@ logging:
     org.hibernate.SQL: DEBUG
     com.template.OAuth.service.AuditService: DEBUG
 
-# Disable caching for templates and static resources
+# Dev-time template/resource caching
 spring.thymeleaf.cache: false
 spring.resources.cache.period: 0
-

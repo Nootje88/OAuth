@@ -2,11 +2,13 @@
 spring:
   profiles:
     active: dev  # Default profile is development
+
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/OAuthTemplate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     properties:
       hibernate:
@@ -14,10 +16,12 @@ spring:
     show-sql: true
     hibernate:
       ddl-auto: update
+
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+
   security:
     oauth2:
       client:
@@ -32,55 +36,52 @@ spring:
               - email
     rate-limiting:
       enabled: true
-      # General API requests per minute per IP
-      default-limit: 100
-      # Authentication endpoints requests per minute per IP
-      auth-limit: 100
-      # Sensitive operations requests per minute per IP
-      sensitive-limit: 3
-      # Time in minutes to block IP after too many failed attempts
+      default-limit: 100        # General API requests per minute per IP
+      auth-limit: 100           # Authentication endpoints per minute per IP
+      sensitive-limit: 3        # Sensitive operations per minute per IP
       block-duration-minutes: 30
-      # Number of failed attempts before blocking IP
       max-failed-attempts: 5
+  
 
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
 
-# Common application settings
+# Common application settings (no environment-specific secrets here)
 app:
   security:
     jwt:
       secret: ${JWT_SECRET:defaultsecretkey12345678901234567890}
-      expiration: 3600000         # JWT token expiration time in milliseconds (1 hour)
+      expiration: 3600000         # 1 hour
     refresh:
-      expiration: 604800000       # Refresh token expiration time (7 days)
+      expiration: 604800000       # 7 days
     verification:
-      expirationHours: 24         # Email verification token expiration time in hours
+      expirationHours: 24
     passwordReset:
-      expirationHours: 1          # Password reset token expiration time in hours
+      expirationHours: 1
     cookie:
-      secure: false               # Allows cookies over HTTP in dev (set to true in production)
-      sameSite: lax
+      secure: false               # overridden in prod
+      sameSite: Lax               # normalized case
   profile:
-    max-bio-length: 500           # Maximum biography length in characters
-    default-theme: SYSTEM         # Default theme preference
-    upload-dir: ${UPLOAD_DIR:uploads/profiles}  # Profile picture upload directory
+    max-bio-length: 500
+    default-theme: SYSTEM
+    upload-dir: ${UPLOAD_DIR:uploads/profiles}
+
+  # Presentation-only email fields (transport creds live in profile YAML via spring.mail.*)
   email:
-    host: ${EMAIL_HOST:smtp.gmail.com}
-    port: ${EMAIL_PORT:587}
-    username: ${EMAIL_USERNAME:email@example.com}
-    password: ${EMAIL_PASSWORD:password}
     fromAddress: ${EMAIL_FROM_ADDRESS:no-reply@example.com}
     fromName: ${EMAIL_FROM_NAME:OAuth Template App}
-    debug: ${EMAIL_DEBUG:false}
+
   application:
     baseUrl: ${APP_BASE_URL:http://localhost:3000}
     supportEmail: ${SUPPORT_EMAIL:support@example.com}
     name: ${APP_NAME:OAuth Template}
+    verifyBaseUrl: ${VERIFY_BASE_URL:http://localhost:8080}
+
   cors:
-    allowedOrigins:
+    allowed-origins:            # normalized to kebab-case to match your CorsConfig binding
       - ${FRONTEND_URL:http://localhost:3000}
+
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
   login-success-redirect-url: ${LOGIN_SUCCESS_REDIRECT_URL:/home}
   admin-emails: ${ADMIN_EMAILS:admin@example.com}

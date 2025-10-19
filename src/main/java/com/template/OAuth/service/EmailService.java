@@ -44,12 +44,15 @@ public class EmailService {
 
             Context context = new Context();
             context.setVariable("name", name);
-            context.setVariable("verificationUrl",
-                    appProperties.getApplication().getBaseUrl() + "/verify-email?token=" + token);
+            String verifyUrl = appProperties.getApplication().getVerifyBaseUrl()
+            + "/auth/verify-email?token=" + token;
+            context.setVariable("verificationUrl", verifyUrl);
+        
             context.setVariable("expirationHours", appProperties.getSecurity().getVerification().getExpirationHours());
             context.setVariable("supportEmail", appProperties.getApplication().getSupportEmail());
 
-            String emailContent = templateEngine.process("email-verification", context);
+            String emailContent = templateEngine.process("mail/email-verification", context);
+           
 
             helper.setTo(to);
             helper.setSubject(messageService.getMessage("email.verification.subject"));
@@ -77,7 +80,7 @@ public class EmailService {
             context.setVariable("expirationHours", appProperties.getSecurity().getPasswordReset().getExpirationHours());
             context.setVariable("supportEmail", appProperties.getApplication().getSupportEmail());
 
-            String emailContent = templateEngine.process("password-reset", context);
+            String emailContent = templateEngine.process("mail/password-reset", context);
 
             helper.setTo(to);
             helper.setSubject(messageService.getMessage("email.password.reset.subject"));
@@ -103,7 +106,7 @@ public class EmailService {
             context.setVariable("loginUrl", appProperties.getApplication().getBaseUrl() + "/login");
             context.setVariable("supportEmail", appProperties.getApplication().getSupportEmail());
 
-            String emailContent = templateEngine.process("welcome-email", context);
+            String emailContent = templateEngine.process("mail/welcome-email", context);
 
             helper.setTo(to);
             helper.setSubject(messageService.getMessage("email.welcome.subject"));
