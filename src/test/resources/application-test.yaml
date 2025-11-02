@@ -15,7 +15,7 @@ spring:
 
   # Disable actual mail sending for tests
   mail:
-    host: localhost
+    host: invalid
     port: 3025
     username: test
     password: test
@@ -69,6 +69,7 @@ logging:
     root: INFO
     com.template.OAuth: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE
 
 # Test-specific properties (for testing only)
 jwt:
